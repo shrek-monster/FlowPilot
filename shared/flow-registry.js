@@ -5,7 +5,7 @@
   const DEFAULT_OPENAI_TARGET_ID = 'cpa';
   const DEFAULT_KIRO_TARGET_ID = 'kiro-rs';
   const DEFAULT_KIRO_PUBLICATION_TARGET_ID = 'kiro-rs';
-  const DEFAULT_KIRO_RS_URL = 'https://kiro.leftcode.xyz/admin';
+  const DEFAULT_KIRO_RS_URL = '';
   const OPENAI_TARGET_IDS = Object.freeze(['cpa', 'sub2api', 'codex2api']);
   const SHARED_SERVICE_IDS = Object.freeze(['account', 'email', 'proxy']);
 

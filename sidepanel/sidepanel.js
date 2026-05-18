@@ -173,6 +173,7 @@ const rowCodex2ApiAdminKey = document.getElementById('row-codex2api-admin-key');
 const inputCodex2ApiAdminKey = document.getElementById('input-codex2api-admin-key');
 const rowKiroRsUrl = document.getElementById('row-kiro-rs-url');
 const inputKiroRsUrl = document.getElementById('input-kiro-rs-url');
+const btnOpenKiroRsGithub = document.getElementById('btn-open-kiro-rs-github');
 const rowKiroRsKey = document.getElementById('row-kiro-rs-key');
 const inputKiroRsKey = document.getElementById('input-kiro-rs-key');
 const btnTestKiroRs = document.getElementById('btn-test-kiro-rs');
@@ -4256,9 +4257,7 @@ function collectSettingsPayload() {
       return Number.isSafeInteger(numeric) && numeric >= 1 ? numeric : 1;
     });
   const flowRegistryApi = typeof getFlowRegistry === 'function' ? getFlowRegistry() : null;
-  const defaultKiroRsUrl = String(
-    flowRegistryApi?.DEFAULT_KIRO_RS_URL || 'https://kiro.leftcode.xyz/admin'
-  ).trim() || 'https://kiro.leftcode.xyz/admin';
+  const defaultKiroRsUrl = String(flowRegistryApi?.DEFAULT_KIRO_RS_URL || '').trim();
   const normalizeKiroTargetIdSafe = typeof normalizeTargetIdForFlow === 'function'
     ? normalizeTargetIdForFlow
     : ((_flowId, targetId = '', fallback = 'kiro-rs') => {
@@ -10034,11 +10033,7 @@ function applySettingsState(state) {
   }
   inputSub2ApiDefaultProxy.value = state?.sub2apiDefaultProxyName || '';
   if (typeof inputKiroRsUrl !== 'undefined' && inputKiroRsUrl) {
-    inputKiroRsUrl.value = String(
-      state?.kiroRsUrl
-      || getFlowRegistry()?.DEFAULT_KIRO_RS_URL
-      || 'https://kiro.leftcode.xyz/admin'
-    ).trim();
+    inputKiroRsUrl.value = String(state?.kiroRsUrl || '').trim();
   }
   if (typeof inputKiroRsKey !== 'undefined' && inputKiroRsKey) {
     inputKiroRsKey.value = String(state?.kiroRsKey || '');
@@ -13891,6 +13886,10 @@ btnGpcCardKeyPurchase?.addEventListener('click', () => {
 
 btnGpcHelperConvertApiKey?.addEventListener('click', () => {
   openExternalUrl(GPC_HELPER_PORTAL_URL);
+});
+
+btnOpenKiroRsGithub?.addEventListener('click', () => {
+  openExternalUrl('https://github.com/hank9999/kiro.rs');
 });
 
 btnGpcHelperBalance?.addEventListener('click', async () => {

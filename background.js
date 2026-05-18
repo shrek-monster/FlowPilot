@@ -913,7 +913,7 @@ const PERSISTED_SETTING_DEFAULTS = {
   panelMode: 'cpa',
   activeFlowId: DEFAULT_ACTIVE_FLOW_ID,
   kiroTargetId: 'kiro-rs',
-  kiroRsUrl: self.MultiPageFlowRegistry?.DEFAULT_KIRO_RS_URL || 'https://kiro.leftcode.xyz/admin',
+  kiroRsUrl: String(self.MultiPageFlowRegistry?.DEFAULT_KIRO_RS_URL || '').trim(),
   kiroRsKey: '',
   vpsUrl: '',
   vpsPassword: '',
@@ -2769,11 +2769,7 @@ function normalizePersistentSettingValue(key, value) {
       }
       return String(value || '').trim().toLowerCase() === 'kiro-rs' ? 'kiro-rs' : 'kiro-rs';
     case 'kiroRsUrl':
-      return String(
-        value
-        || self.MultiPageFlowRegistry?.DEFAULT_KIRO_RS_URL
-        || 'https://kiro.leftcode.xyz/admin'
-      ).trim() || 'https://kiro.leftcode.xyz/admin';
+      return String(value || '').trim();
     case 'kiroRsKey':
       return String(value || '').trim();
     case 'vpsUrl':

@@ -39,6 +39,7 @@ test('sidepanel html exposes flow selector and kiro source fields', () => {
     'id="label-source-selector"',
     'id="row-step6-cookie-settings"',
     'id="row-kiro-rs-url"',
+    'id="btn-open-kiro-rs-github"',
     'id="row-kiro-rs-key"',
     'id="btn-test-kiro-rs"',
     'id="row-kiro-rs-test-status"',

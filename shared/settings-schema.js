@@ -37,7 +37,7 @@
     ).trim().toLowerCase() || 'openai';
     const defaultOpenAiTargetId = flowRegistry.DEFAULT_OPENAI_TARGET_ID || 'cpa';
     const defaultKiroTargetId = flowRegistry.DEFAULT_KIRO_TARGET_ID || 'kiro-rs';
-    const defaultKiroRsUrl = flowRegistry.DEFAULT_KIRO_RS_URL || 'https://kiro.leftcode.xyz/admin';
+    const defaultKiroRsUrl = String(flowRegistry.DEFAULT_KIRO_RS_URL || '').trim();
     const normalizeFlowId = typeof flowRegistry.normalizeFlowId === 'function'
       ? flowRegistry.normalizeFlowId
       : ((value = '', fallback = defaultFlowId) => {

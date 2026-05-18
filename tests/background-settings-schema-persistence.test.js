@@ -101,7 +101,7 @@ const PERSISTED_SETTING_DEFAULTS = {
   ipProxyService: '711proxy',
   ipProxyMode: 'account',
   kiroTargetId: 'kiro-rs',
-  kiroRsUrl: 'https://kiro.leftcode.xyz/admin',
+  kiroRsUrl: '',
   kiroRsKey: '',
   stepExecutionRangeByFlow: {},
 };
