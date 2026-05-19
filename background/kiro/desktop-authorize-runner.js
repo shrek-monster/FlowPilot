@@ -9,6 +9,7 @@
   const MAIL_2925_FILTER_LOOKBACK_MS = 10 * 60 * 1000;
   const KIRO_REGISTER_PAGE_SOURCE_ID = 'kiro-register-page';
   const KIRO_DESKTOP_SOURCE_ID = 'kiro-desktop-authorize';
+  const KIRO_WEB_ACCOUNT_URL = 'https://app.kiro.dev/settings/account';
   const KIRO_WEB_TAB_URL_PATTERNS = Object.freeze([
     'https://app.kiro.dev/*',
     'https://kiro.dev/*',
@@ -704,6 +705,32 @@
       return candidates;
     }
 
+    async function openKiroWebAccountSessionTab() {
+      let tabId = null;
+      let tabUrl = KIRO_WEB_ACCOUNT_URL;
+      if (chrome?.tabs?.create) {
+        const tab = await chrome.tabs.create({
+          url: KIRO_WEB_ACCOUNT_URL,
+          active: true,
+        });
+        tabId = Number(tab?.id);
+        tabUrl = cleanString(tab?.url || KIRO_WEB_ACCOUNT_URL);
+      } else {
+        tabId = await reuseOrCreateTab(KIRO_REGISTER_PAGE_SOURCE_ID, KIRO_WEB_ACCOUNT_URL, {
+          inject: Array.isArray(KIRO_REGISTER_INJECT_FILES) ? KIRO_REGISTER_INJECT_FILES : null,
+          injectSource: KIRO_REGISTER_PAGE_SOURCE_ID,
+        });
+      }
+      if (!Number.isInteger(tabId)) {
+        throw new Error('无法打开 Kiro 账号页，请手动打开 app.kiro.dev/settings/account 后重试步骤 7。');
+      }
+      await registerTab(KIRO_REGISTER_PAGE_SOURCE_ID, tabId);
+      return {
+        id: tabId,
+        url: tabUrl || KIRO_WEB_ACCOUNT_URL,
+      };
+    }
+
     async function readKiroWebSessionStateFromTab(tabId, options = {}) {
       const timeoutBudget = resolveTimeoutBudget(options);
       if (typeof waitForTabStableComplete === 'function') {
@@ -756,21 +783,27 @@
         };
       }
 
-      const tabs = await collectKiroWebSessionTabs(currentState);
+      const attemptedTabIds = new Set();
       let detectedSignedInWithoutEmail = false;
-      for (const tab of tabs) {
+      let lastRecoveryError = '';
+      const tryRestoreFromTab = async (tab) => {
+        const tabId = Number(tab?.id);
+        if (!Number.isInteger(tabId) || attemptedTabIds.has(tabId)) {
+          return null;
+        }
+        attemptedTabIds.add(tabId);
         try {
-          const pageState = await readKiroWebSessionStateFromTab(tab.id, {
+          const pageState = await readKiroWebSessionStateFromTab(tabId, {
             timeoutMs: DEFAULT_KIRO_PAGE_LOAD_TIMEOUT_MS,
             injectLogMessage: '步骤 7：Kiro Web 页面内容脚本未就绪，正在等待页面恢复...',
           });
           if (pageState?.state !== 'kiro_web_signed_in') {
-            continue;
+            return null;
           }
           const detectedEmail = cleanString(pageState.accountEmail || pageState.email || existingEmail);
           if (!detectedEmail) {
             detectedSignedInWithoutEmail = true;
-            continue;
+            return null;
           }
 
           const restoredAt = Date.now();
@@ -811,18 +844,36 @@
             restored: true,
           };
         } catch (error) {
+          lastRecoveryError = getErrorMessage(error);
           console.warn('[MultiPage:kiro-desktop-authorize] restore web session failed', {
-            tabId: tab?.id,
+            tabId,
             url: tab?.url,
-            message: getErrorMessage(error),
+            message: lastRecoveryError,
           });
         }
+        return null;
+      };
+
+      const tabs = await collectKiroWebSessionTabs(currentState);
+      for (const tab of tabs) {
+        const restoredSession = await tryRestoreFromTab(tab);
+        if (restoredSession) {
+          return restoredSession;
+        }
+      }
+
+      await log('步骤 7：未能从已打开页面确认 Kiro Web 登录态，正在打开 Kiro 账号页重新确认...', 'info', nodeId);
+      const accountTab = await openKiroWebAccountSessionTab();
+      const restoredSession = await tryRestoreFromTab(accountTab);
+      if (restoredSession) {
+        return restoredSession;
       }
 
       if (detectedSignedInWithoutEmail) {
         throw new Error('已检测到 Kiro Web 登录态，但未能识别账号邮箱。请打开 Kiro 账号设置页后重试步骤 7。');
       }
-      throw new Error('Kiro Web 登录态尚未建立。请先完成步骤 6，或打开已登录的 Kiro Web 页面后从步骤 7 继续。');
+      const detail = lastRecoveryError ? `最后一次检测错误：${lastRecoveryError}` : '';
+      throw new Error(`Kiro Web 登录态尚未建立。请在自动打开的 Kiro 账号页登录后，从步骤 7 继续。${detail}`);
     }
 
     function buildDesktopOtpPollPayload(step, state = {}, mail = {}, filterAfterTimestamp = 0) {
