@@ -21,6 +21,7 @@ importScripts(
   'gopay-utils.js',
   'phone-sms/providers/hero-sms.js',
   'phone-sms/providers/five-sim.js',
+  'phone-sms/providers/madao.js',
   'phone-sms/providers/registry.js',
   'background/phone-verification-flow.js',
   'background/account-run-history.js',
@@ -699,11 +700,13 @@ const PHONE_SMS_PROVIDER_5SIM = '5sim';
 const PHONE_SMS_PROVIDER_HERO_SMS = PHONE_SMS_PROVIDER_HERO;
 const PHONE_SMS_PROVIDER_FIVE_SIM = PHONE_SMS_PROVIDER_5SIM;
 const PHONE_SMS_PROVIDER_NEXSMS = 'nexsms';
+const PHONE_SMS_PROVIDER_MADAO = 'madao';
 const DEFAULT_PHONE_SMS_PROVIDER = PHONE_SMS_PROVIDER_HERO;
 const DEFAULT_PHONE_SMS_PROVIDER_ORDER = Object.freeze([
   PHONE_SMS_PROVIDER_HERO,
   PHONE_SMS_PROVIDER_5SIM,
   PHONE_SMS_PROVIDER_NEXSMS,
+  PHONE_SMS_PROVIDER_MADAO,
 ]);
 const DEFAULT_FIVE_SIM_BASE_URL = 'https://5sim.net/v1';
 const DEFAULT_FIVE_SIM_PRODUCT = 'openai';
@@ -712,6 +715,8 @@ const DEFAULT_FIVE_SIM_COUNTRY_ORDER = Object.freeze(['thailand']);
 const DEFAULT_NEX_SMS_BASE_URL = 'https://api.nexsms.net';
 const DEFAULT_NEX_SMS_SERVICE_CODE = 'ot';
 const DEFAULT_NEX_SMS_COUNTRY_ORDER = Object.freeze([1]);
+const DEFAULT_MADAO_BASE_URL = 'http://127.0.0.1:7822';
+const DEFAULT_MADAO_MODE = 'routing_plan';
 const DEFAULT_HERO_SMS_REUSE_ENABLED = true;
 const HERO_SMS_ACQUIRE_PRIORITY_COUNTRY = 'country';
 const HERO_SMS_ACQUIRE_PRIORITY_PRICE = 'price';
@@ -1477,6 +1482,16 @@ const PERSISTED_SETTING_DEFAULTS = {
   nexSmsApiKey: '',
   nexSmsCountryOrder: [...DEFAULT_NEX_SMS_COUNTRY_ORDER],
   nexSmsServiceCode: DEFAULT_NEX_SMS_SERVICE_CODE,
+  madaoBaseUrl: DEFAULT_MADAO_BASE_URL,
+  madaoHttpSecret: '',
+  madaoMode: DEFAULT_MADAO_MODE,
+  madaoRoutingPlanId: '',
+  madaoProviderId: '',
+  madaoCountry: '',
+  madaoAutoPickCountry: true,
+  madaoReusePhone: true,
+  madaoMinPrice: '',
+  madaoMaxPrice: '',
   phonePreferredActivation: null,
 };
 
@@ -1864,6 +1879,9 @@ function normalizePhoneSmsProvider(value = '') {
   if (normalized === PHONE_SMS_PROVIDER_NEXSMS) {
     return PHONE_SMS_PROVIDER_NEXSMS;
   }
+  if (normalized === PHONE_SMS_PROVIDER_MADAO) {
+    return PHONE_SMS_PROVIDER_MADAO;
+  }
   return PHONE_SMS_PROVIDER_HERO_SMS;
 }
 function normalizePhoneSmsProviderOrder(value = [], fallbackOrder = []) {
@@ -2210,6 +2228,56 @@ function normalizeNexSmsServiceCode(value = '', fallback = DEFAULT_NEX_SMS_SERVI
     .toLowerCase()
     .replace(/[^a-z0-9_-]/g, '');
   return fallbackNormalized || DEFAULT_NEX_SMS_SERVICE_CODE;
+}
+
+function normalizeMaDaoBaseUrl(value = '') {
+  const normalized = normalizeLocalHttpBaseUrl(value, DEFAULT_MADAO_BASE_URL);
+  try {
+    const parsed = new URL(normalized);
+    parsed.pathname = parsed.pathname.replace(
+      /\/api\/(?:acquire|poll|release|routing\/replace)$/i,
+      ''
+    );
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString().replace(/\/$/, '');
+  } catch {
+    return DEFAULT_MADAO_BASE_URL;
+  }
+}
+
+function normalizeMaDaoMode(value = '') {
+  return String(value || '').trim().toLowerCase() === 'direct' ? 'direct' : DEFAULT_MADAO_MODE;
+}
+
+function normalizeMaDaoIdentifier(value = '') {
+  return String(value || '').trim();
+}
+
+function normalizeMaDaoProviderId(value = '') {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '');
+}
+
+function normalizeMaDaoCountry(value = '') {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
+    return '';
+  }
+  const lowered = trimmed.toLowerCase();
+  if (lowered === 'any' || lowered === 'local') {
+    return lowered;
+  }
+  if (/^[a-z]{2}$/i.test(trimmed)) {
+    return trimmed.toUpperCase();
+  }
+  return lowered.replace(/[^a-z0-9_-]+/g, '');
+}
+
+function normalizeMaDaoPrice(value = '') {
+  return normalizeHeroSmsMaxPrice(value);
 }
 
 function normalizePhonePreferredActivation(value) {
@@ -3606,6 +3674,24 @@ function normalizePersistentSettingValue(key, value) {
       return normalizeNexSmsCountryOrder(value);
     case 'nexSmsServiceCode':
       return normalizeNexSmsServiceCode(value);
+    case 'madaoBaseUrl':
+      return normalizeMaDaoBaseUrl(value);
+    case 'madaoHttpSecret':
+      return String(value || '');
+    case 'madaoMode':
+      return normalizeMaDaoMode(value);
+    case 'madaoRoutingPlanId':
+      return normalizeMaDaoIdentifier(value);
+    case 'madaoProviderId':
+      return normalizeMaDaoProviderId(value);
+    case 'madaoCountry':
+      return normalizeMaDaoCountry(value);
+    case 'madaoAutoPickCountry':
+    case 'madaoReusePhone':
+      return Boolean(value);
+    case 'madaoMinPrice':
+    case 'madaoMaxPrice':
+      return normalizeMaDaoPrice(value);
     case 'phonePreferredActivation':
       return normalizePhonePreferredActivation(value);
     default:
@@ -13878,6 +13964,7 @@ const phoneVerificationHelpers = self.MultiPageBackgroundPhoneVerification?.crea
   sleepWithStop,
   throwIfStopped,
   createFiveSimProvider: self.PhoneSmsFiveSimProvider?.createProvider,
+  createMaDaoProvider: self.PhoneSmsMaDaoProvider?.createProvider,
 });
 const step1Executor = self.MultiPageBackgroundStep1?.createStep1Executor({
   addLog,

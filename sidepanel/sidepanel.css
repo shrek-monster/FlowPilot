@@ -128,26 +128,10 @@ header {
   flex: 1;
 }
 
-.header-left svg { color: var(--blue); }
-
-.header-icon-link {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
+.header-repo-btn {
   flex-shrink: 0;
-  appearance: none;
 }
 
-.header-icon-link:hover svg {
-  color: var(--text-primary);
-}
-
-.header-icon-link:focus-visible,
 .header-version-link:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--blue) 28%, transparent);
   outline-offset: 2px;
@@ -321,29 +305,6 @@ header {
   outline-offset: 1px;
 }
 
-/* ============================================================
-   Theme Toggle
-   ============================================================ */
-
-.theme-toggle {
-  width: 30px;
-  height: 30px;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--transition);
-}
-.theme-toggle:hover { background: var(--bg-hover); color: var(--text-primary); }
-.theme-toggle .icon-moon { display: block; }
-.theme-toggle .icon-sun { display: none; }
-[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
-[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
-
 .header-menu {
   position: relative;
   display: flex;
@@ -422,6 +383,8 @@ header {
   line-height: 1;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+  background: var(--bg-field);
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--transition);
   white-space: nowrap;
@@ -486,8 +449,17 @@ header {
 }
 .btn-outline:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-soft); }
 
-.btn-sm { padding-inline: 12px; font-size: 12px; }
-.btn-xs { padding-inline: 10px; font-size: 11px; }
+.btn-sm {
+  min-height: var(--data-field-height);
+  padding-inline: 12px;
+  font-size: 12px;
+}
+
+.btn-xs {
+  min-height: var(--data-field-height);
+  padding-inline: 10px;
+  font-size: 11px;
+}
 
 /* ============================================================
    Extension Updates
@@ -1556,6 +1528,7 @@ header {
   min-width: var(--data-inline-action-min-width);
   min-height: var(--data-field-height);
   justify-content: center;
+  white-space: nowrap;
 }
 
 .hotmail-card {
@@ -2922,22 +2895,27 @@ header {
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
-  width: 48px;
+  width: 76px;
   flex-shrink: 0;
 }
 
 .step-manual-btn {
-  width: 20px;
-  height: 20px;
-  padding: 0;
+  min-width: 48px;
+  min-height: 26px;
+  padding: 0 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: var(--bg-surface);
   color: var(--text-muted);
   cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
   transition: all var(--transition);
 }
 .step-manual-btn:hover:not(:disabled) {

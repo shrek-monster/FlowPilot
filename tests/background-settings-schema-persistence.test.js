@@ -6,6 +6,8 @@ const { readFlowRegistryBundle } = require('./helpers/script-bundles.js');
 const flowRegistrySource = readFlowRegistryBundle();
 const settingsSchemaSource = fs.readFileSync('core/flow-kernel/settings-schema.js', 'utf8');
 const backgroundSource = fs.readFileSync('background.js', 'utf8');
+const DEFAULT_MADAO_BASE_URL_FOR_TEST = 'http://127.0.0.1:7822';
+const DEFAULT_MADAO_MODE_FOR_TEST = 'routing_plan';
 
 function extractFunction(name) {
   const markers = [`async function ${name}(`, `function ${name}(`];
@@ -91,6 +93,8 @@ const SETTINGS_SCHEMA_VIEW_KEYS = Object.freeze([
   'stepExecutionRangeByFlow',
 ]);
 const SETTINGS_SCHEMA_VIEW_KEY_SET = new Set(SETTINGS_SCHEMA_VIEW_KEYS);
+const DEFAULT_MADAO_BASE_URL = 'http://127.0.0.1:7822';
+const DEFAULT_MADAO_MODE = 'routing_plan';
 const PERSISTED_SETTING_DEFAULTS = {
   activeFlowId: DEFAULT_ACTIVE_FLOW_ID,
   targetId: 'cpa',
@@ -107,6 +111,17 @@ const PERSISTED_SETTING_DEFAULTS = {
   ipProxyMode: 'account',
   kiroRsUrl: '',
   kiroRsKey: '',
+  phoneSmsProvider: 'hero-sms',
+  madaoBaseUrl: DEFAULT_MADAO_BASE_URL,
+  madaoHttpSecret: '',
+  madaoMode: DEFAULT_MADAO_MODE,
+  madaoRoutingPlanId: '',
+  madaoProviderId: '',
+  madaoCountry: '',
+  madaoAutoPickCountry: true,
+  madaoReusePhone: true,
+  madaoMinPrice: '',
+  madaoMaxPrice: '',
   stepExecutionRangeByFlow: {},
 };
 const PERSISTED_SETTING_KEYS = Object.keys(PERSISTED_SETTING_DEFAULTS);
@@ -158,6 +173,68 @@ function normalizeCustomMailHelperBaseUrl(value = '') {
   }
 }
 function normalizeStepExecutionRangeByFlow(value) { return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
+function normalizePhoneSmsProvider(value = '') {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === '5sim' || normalized === 'nexsms' || normalized === 'madao') {
+    return normalized;
+  }
+  return 'hero-sms';
+}
+function normalizePhoneSmsProviderOrder(value = []) {
+  const source = Array.isArray(value) ? value : String(value || '').split(/[\\r\\n,]+/);
+  const seen = new Set();
+  return source
+    .map((entry) => normalizePhoneSmsProvider(entry))
+    .filter((provider) => {
+      if (!provider || seen.has(provider)) return false;
+      seen.add(provider);
+      return true;
+    })
+    .slice(0, 4);
+}
+function normalizeLocalHttpBaseUrl(value = '', fallback = DEFAULT_MADAO_BASE_URL) {
+  const rawValue = String(value || fallback).trim();
+  try {
+    const parsed = new URL(rawValue);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return fallback;
+    }
+    return parsed.toString().replace(/\\/$/, '');
+  } catch {
+    return fallback;
+  }
+}
+function normalizeMaDaoBaseUrl(value = '') {
+  const normalized = normalizeLocalHttpBaseUrl(value, DEFAULT_MADAO_BASE_URL);
+  try {
+    const parsed = new URL(normalized);
+    parsed.pathname = parsed.pathname.replace(/\\/api\\/(?:acquire|poll|release|routing\\/replace)$/i, '');
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString().replace(/\\/$/, '');
+  } catch {
+    return DEFAULT_MADAO_BASE_URL;
+  }
+}
+function normalizeMaDaoMode(value = '') { return String(value || '').trim().toLowerCase() === 'direct' ? 'direct' : DEFAULT_MADAO_MODE; }
+function normalizeMaDaoIdentifier(value = '') { return String(value || '').trim(); }
+function normalizeMaDaoProviderId(value = '') { return String(value || '').trim().toLowerCase().replace(/[^a-z0-9_-]+/g, ''); }
+function normalizeMaDaoCountry(value = '') {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return '';
+  const lowered = trimmed.toLowerCase();
+  if (lowered === 'any' || lowered === 'local') return lowered;
+  if (/^[a-z]{2}$/i.test(trimmed)) return trimmed.toUpperCase();
+  return lowered.replace(/[^a-z0-9_-]+/g, '');
+}
+function normalizeHeroSmsMaxPrice(value = '') {
+  const rawValue = String(value ?? '').trim();
+  if (!rawValue) return '';
+  const numeric = Number(rawValue);
+  if (!Number.isFinite(numeric) || numeric <= 0) return '';
+  return String(Math.round(numeric * 10000) / 10000);
+}
+function normalizeMaDaoPrice(value = '') { return normalizeHeroSmsMaxPrice(value); }
 function normalizeIpProxyProviderValue(value) { return String(value || '711proxy').trim() || '711proxy'; }
 function normalizeIpProxyMode(value) { return String(value || 'account').trim() || 'account'; }
 function normalizeIpProxyServiceProfiles(value) { return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
@@ -226,6 +303,11 @@ test('buildPersistentSettingsPayload writes canonical settings schema into persi
   assert.equal(payload.targetId, 'kiro-rs');
   assert.equal(payload.kiroRsUrl, 'https://kiro.example.com/admin');
   assert.equal(payload.kiroRsKey, 'secret-key');
+  assert.equal(payload.phoneSmsProvider, 'hero-sms');
+  assert.equal(payload.madaoBaseUrl, DEFAULT_MADAO_BASE_URL_FOR_TEST);
+  assert.equal(payload.madaoMode, DEFAULT_MADAO_MODE_FOR_TEST);
+  assert.equal(payload.madaoAutoPickCountry, true);
+  assert.equal(payload.madaoReusePhone, true);
   assert.equal(Object.prototype.hasOwnProperty.call(payload, 'kiroRegion'), false);
   assert.equal(payload.settingsSchemaVersion, 5);
   assert.equal(payload.settingsState.activeFlowId, 'kiro');
@@ -335,6 +417,8 @@ function getRequestedKeys() {
   assert.ok(api.getRequestedKeys().includes('plusAccountAccessStrategy'));
   assert.equal(state.settingsSchemaVersion, 5);
   assert.equal(state.settingsState.activeFlowId, 'openai');
+  assert.ok(api.getRequestedKeys().includes('madaoBaseUrl'));
+  assert.ok(api.getRequestedKeys().includes('madaoMode'));
 });
 
 test('getPersistedSettings can project schema-only storage back into legacy flat settings', async () => {
@@ -627,6 +711,37 @@ function getRemovedKeys() {
   assert.equal(write.settingsState.services.email.customReceiveMode, 'helper');
   assert.equal(write.settingsState.services.email.customHelperBaseUrl, 'http://127.0.0.1:17374');
   assert.equal(Object.prototype.hasOwnProperty.call(write, 'customMailReceiveMode'), false);
+});
+
+test('buildPersistentSettingsPayload persists normalized MaDao flat settings outside canonical settingsState', () => {
+  const api = buildHarness();
+
+  const payload = api.buildPersistentSettingsPayload({
+    phoneSmsProvider: 'MaDao',
+    madaoBaseUrl: 'http://127.0.0.1:7822/api/acquire?x=1',
+    madaoHttpSecret: ' secret-token ',
+    madaoMode: 'direct',
+    madaoRoutingPlanId: ' rp-openai ',
+    madaoProviderId: ' Upstream A! ',
+    madaoCountry: ' gb ',
+    madaoAutoPickCountry: 0,
+    madaoReusePhone: 1,
+    madaoMinPrice: '0.123456',
+    madaoMaxPrice: '-1',
+  });
+
+  assert.equal(payload.phoneSmsProvider, 'madao');
+  assert.equal(payload.madaoBaseUrl, DEFAULT_MADAO_BASE_URL_FOR_TEST);
+  assert.equal(payload.madaoHttpSecret, ' secret-token ');
+  assert.equal(payload.madaoMode, 'direct');
+  assert.equal(payload.madaoRoutingPlanId, 'rp-openai');
+  assert.equal(payload.madaoProviderId, 'upstreama');
+  assert.equal(payload.madaoCountry, 'GB');
+  assert.equal(payload.madaoAutoPickCountry, false);
+  assert.equal(payload.madaoReusePhone, true);
+  assert.equal(payload.madaoMinPrice, '0.1235');
+  assert.equal(payload.madaoMaxPrice, '');
+  assert.equal(Object.prototype.hasOwnProperty.call(payload.settingsState || {}, 'madaoBaseUrl'), false);
 });
 
 test('setPersistentSettings mirrors flat schema updates without resetting other canonical settings', async () => {

@@ -412,6 +412,17 @@ return {
       cloudMailToken: 'cloud-token',
       gopayHelperApiKey: 'gpc-key',
       heroSmsApiKey: 'hero-key',
+      phoneSmsProvider: 'madao',
+      madaoBaseUrl: 'http://127.0.0.1:7822',
+      madaoHttpSecret: 'madao-secret',
+      madaoMode: 'routing_plan',
+      madaoRoutingPlanId: 'rp-openai',
+      madaoProviderId: 'upstream-a',
+      madaoCountry: 'GB',
+      madaoAutoPickCountry: false,
+      madaoReusePhone: true,
+      madaoMinPrice: '0.12',
+      madaoMaxPrice: '0.45',
       hotmailAccounts: [
         { id: 'hotmail-1', email: 'owner@example.com', password: 'mail-pass' },
       ],
@@ -434,6 +445,17 @@ return {
   assert.equal(api.getPayloadInput().cloudMailToken, 'cloud-token');
   assert.equal(api.getPayloadInput().gopayHelperApiKey, 'gpc-key');
   assert.equal(api.getPayloadInput().heroSmsApiKey, 'hero-key');
+  assert.equal(api.getPayloadInput().phoneSmsProvider, 'madao');
+  assert.equal(api.getPayloadInput().madaoBaseUrl, 'http://127.0.0.1:7822');
+  assert.equal(api.getPayloadInput().madaoHttpSecret, 'madao-secret');
+  assert.equal(api.getPayloadInput().madaoMode, 'routing_plan');
+  assert.equal(api.getPayloadInput().madaoRoutingPlanId, 'rp-openai');
+  assert.equal(api.getPayloadInput().madaoProviderId, 'upstream-a');
+  assert.equal(api.getPayloadInput().madaoCountry, 'GB');
+  assert.equal(api.getPayloadInput().madaoAutoPickCountry, false);
+  assert.equal(api.getPayloadInput().madaoReusePhone, true);
+  assert.equal(api.getPayloadInput().madaoMinPrice, '0.12');
+  assert.equal(api.getPayloadInput().madaoMaxPrice, '0.45');
   assert.deepEqual(api.getPayloadInput().hotmailAccounts, [
     { id: 'hotmail-1', email: 'owner@example.com', password: 'mail-pass' },
   ]);
@@ -441,5 +463,6 @@ return {
   assert.equal(api.getPayloadInput().paypalAccounts[0].email, 'paypal@example.com');
   assert.equal(api.getPersistedUpdates().settingsState.flows.kiro.targets['kiro-rs'].apiKey, 'schema-key');
   assert.equal(api.getPersistedUpdates().cloudflareTempEmailAdminAuth, 'admin-secret');
+  assert.equal(api.getPersistedUpdates().madaoRoutingPlanId, 'rp-openai');
   assert.deepEqual(api.getPersistOptions(), { replaceExisting: true });
 });

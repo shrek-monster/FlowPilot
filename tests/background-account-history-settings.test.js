@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
 const source = fs.readFileSync('background.js', 'utf8');
+const DEFAULT_MADAO_BASE_URL_FOR_TEST = 'http://127.0.0.1:7822';
+const DEFAULT_MADAO_MODE_FOR_TEST = 'routing_plan';
 
 function extractFunction(name) {
   const markers = [`async function ${name}(`, `function ${name}(`];
@@ -65,6 +67,12 @@ test('background account history settings are normalized independently from hotm
     extractFunction('normalizeNexSmsCountryId'),
     extractFunction('normalizeNexSmsCountryOrder'),
     extractFunction('normalizeNexSmsServiceCode'),
+    extractFunction('normalizeMaDaoBaseUrl'),
+    extractFunction('normalizeMaDaoMode'),
+    extractFunction('normalizeMaDaoIdentifier'),
+    extractFunction('normalizeMaDaoProviderId'),
+    extractFunction('normalizeMaDaoCountry'),
+    extractFunction('normalizeMaDaoPrice'),
     extractFunction('normalizePhonePreferredActivation'),
     extractFunction('normalizePhoneVerificationReplacementLimit'),
     extractFunction('normalizePhoneCodeWaitSeconds'),
@@ -119,8 +127,11 @@ const DEFAULT_HERO_SMS_OPERATOR = 'any';
 const PHONE_SMS_PROVIDER_HERO_SMS = 'hero-sms';
 const PHONE_SMS_PROVIDER_FIVE_SIM = '5sim';
 const PHONE_SMS_PROVIDER_NEXSMS = 'nexsms';
-const DEFAULT_PHONE_SMS_PROVIDER_ORDER = ['hero-sms', '5sim', 'nexsms'];
+const PHONE_SMS_PROVIDER_MADAO = 'madao';
+const DEFAULT_PHONE_SMS_PROVIDER_ORDER = ['hero-sms', '5sim', 'nexsms', 'madao'];
 const DEFAULT_PHONE_SMS_PROVIDER = PHONE_SMS_PROVIDER_HERO_SMS;
+const DEFAULT_MADAO_BASE_URL = 'http://127.0.0.1:7822';
+const DEFAULT_MADAO_MODE = 'routing_plan';
 const SIGNUP_METHOD_EMAIL = 'email';
 const SIGNUP_METHOD_PHONE = 'phone';
 const DEFAULT_SIGNUP_METHOD = SIGNUP_METHOD_EMAIL;
@@ -293,8 +304,12 @@ return {
   assert.equal(api.normalizePersistentSettingValue('kiroRsKey', ' key-1 '), 'key-1');
   assert.equal(api.normalizePersistentSettingValue('phoneSmsProvider', '5SIM'), '5sim');
   assert.equal(api.normalizePersistentSettingValue('phoneSmsProvider', 'NEXSMS'), 'nexsms');
+  assert.equal(api.normalizePersistentSettingValue('phoneSmsProvider', 'MaDao'), 'madao');
   assert.equal(api.normalizePersistentSettingValue('phoneSmsProvider', 'unknown'), 'hero-sms');
-  assert.deepStrictEqual(api.normalizePersistentSettingValue('phoneSmsProviderOrder', ['nexsms', '5sim', 'nexsms']), ['nexsms', '5sim']);
+  assert.deepStrictEqual(
+    api.normalizePersistentSettingValue('phoneSmsProviderOrder', ['madao', 'nexsms', '5sim', 'nexsms']),
+    ['madao', 'nexsms', '5sim']
+  );
   assert.equal(api.normalizePersistentSettingValue('phoneSmsReuseEnabled', false), false);
   assert.equal(api.normalizePersistentSettingValue('phoneSmsReuseEnabled', true), true);
   assert.equal(api.normalizePersistentSettingValue('fiveSimApiKey', ' demo-five '), ' demo-five ');
@@ -373,6 +388,22 @@ return {
     [1, 6]
   );
   assert.equal(api.normalizePersistentSettingValue('nexSmsServiceCode', ' OT! '), 'ot');
+  assert.equal(
+    api.normalizePersistentSettingValue('madaoBaseUrl', 'http://127.0.0.1:7822/api/acquire?x=1'),
+    DEFAULT_MADAO_BASE_URL_FOR_TEST
+  );
+  assert.equal(api.normalizePersistentSettingValue('madaoBaseUrl', 'ftp://invalid'), DEFAULT_MADAO_BASE_URL_FOR_TEST);
+  assert.equal(api.normalizePersistentSettingValue('madaoHttpSecret', ' secret-token '), ' secret-token ');
+  assert.equal(api.normalizePersistentSettingValue('madaoMode', 'direct'), 'direct');
+  assert.equal(api.normalizePersistentSettingValue('madaoMode', 'unknown'), DEFAULT_MADAO_MODE_FOR_TEST);
+  assert.equal(api.normalizePersistentSettingValue('madaoRoutingPlanId', ' rp/openai! '), 'rp/openai!');
+  assert.equal(api.normalizePersistentSettingValue('madaoProviderId', ' Upstream A! '), 'upstreama');
+  assert.equal(api.normalizePersistentSettingValue('madaoCountry', ' gb '), 'GB');
+  assert.equal(api.normalizePersistentSettingValue('madaoCountry', 'ANY'), 'any');
+  assert.equal(api.normalizePersistentSettingValue('madaoAutoPickCountry', 1), true);
+  assert.equal(api.normalizePersistentSettingValue('madaoReusePhone', 0), false);
+  assert.equal(api.normalizePersistentSettingValue('madaoMinPrice', '0.123456'), '0.1235');
+  assert.equal(api.normalizePersistentSettingValue('madaoMaxPrice', '-1'), '');
   const rangePayload = api.buildPersistentSettingsPayload({
     heroSmsMinPrice: '0.023456',
     fiveSimMinPrice: '0.0789',

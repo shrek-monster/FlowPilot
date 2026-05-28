@@ -88,9 +88,11 @@ test('sidepanel html exposes phone verification toggle and multi-provider SMS ro
   assert.match(html, /id="select-phone-sms-provider"/);
   assert.match(html, /\.\.\/phone-sms\/providers\/hero-sms\.js/);
   assert.match(html, /\.\.\/phone-sms\/providers\/five-sim\.js/);
+  assert.match(html, /\.\.\/phone-sms\/providers\/madao\.js/);
   assert.match(html, /\.\.\/phone-sms\/providers\/registry\.js/);
   assert.match(html, /<option value="hero-sms">HeroSMS<\/option>/);
   assert.match(html, /<option value="5sim">5sim<\/option>/);
+  assert.match(html, /<option value="madao">MaDao<\/option>/);
   assert.match(html, /id="row-hero-sms-country"/);
   assert.match(html, /id="row-hero-sms-country-fallback"/);
   assert.match(html, /id="row-hero-sms-acquire-priority"/);
@@ -147,6 +149,26 @@ test('sidepanel html exposes phone verification toggle and multi-provider SMS ro
   assert.match(html, /id="row-nex-sms-country-fallback"/);
   assert.match(html, /id="row-nex-sms-service-code"/);
   assert.match(html, /id="input-nex-sms-service-code"/);
+  assert.match(html, /id="row-madao-base-url"/);
+  assert.match(html, /id="input-madao-base-url"/);
+  assert.match(html, /id="row-madao-http-secret"/);
+  assert.match(html, /id="input-madao-http-secret"/);
+  assert.match(html, /id="row-madao-mode"/);
+  assert.match(html, /id="select-madao-mode"/);
+  assert.match(html, /id="row-madao-routing-plan-id"/);
+  assert.match(html, /id="input-madao-routing-plan-id"/);
+  assert.match(html, /id="row-madao-provider-id"/);
+  assert.match(html, /id="input-madao-provider-id"/);
+  assert.match(html, /id="row-madao-country"/);
+  assert.match(html, /id="input-madao-country"/);
+  assert.match(html, /id="row-madao-auto-pick-country"/);
+  assert.match(html, /id="input-madao-auto-pick-country"/);
+  assert.match(html, /id="row-madao-reuse-phone"/);
+  assert.match(html, /id="input-madao-reuse-phone"/);
+  assert.match(html, /id="row-madao-price-range"/);
+  assert.match(html, /id="input-madao-min-price"/);
+  assert.match(html, /id="input-madao-max-price"/);
+  assert.doesNotMatch(html, /id="btn-open-madao-github"/);
   assert.doesNotMatch(html, /id="input-account-run-history-text-enabled"/);
 });
 
@@ -623,19 +645,21 @@ const rowPhoneSmsProvider = { style: { display: 'none' } };
 const rowPhoneSmsProviderOrder = { style: { display: 'none' } };
 const rowPhoneSmsProviderOrderActions = { style: { display: 'none' } };
 const selectPhoneSmsProvider = { value: 'hero-sms' };
+const selectMaDaoMode = { value: 'routing_plan' };
 const btnTogglePhoneVerificationSection = {
   disabled: false,
   textContent: '',
   title: '',
   setAttribute: () => {},
 };
-  const DEFAULT_PHONE_SMS_PROVIDER_ORDER = ['hero-sms', '5sim', 'nexsms'];
+  const DEFAULT_PHONE_SMS_PROVIDER_ORDER = ['hero-sms', '5sim', 'nexsms', 'madao'];
   const phoneSmsProviderOrderSelection = [];
+  function getPhoneSmsProviderCount() { return DEFAULT_PHONE_SMS_PROVIDER_ORDER.length; }
   function normalizePhoneSmsProviderOrderValue(value = [], fallbackOrder = DEFAULT_PHONE_SMS_PROVIDER_ORDER) {
     const source = Array.isArray(value) ? value : [];
     const normalized = [...source];
     if (normalized.length) {
-      return normalized.slice(0, 3);
+      return normalized.slice(0, getPhoneSmsProviderCount());
     }
     if (!Array.isArray(fallbackOrder) || !fallbackOrder.length) {
       return [];
@@ -646,7 +670,7 @@ const btnTogglePhoneVerificationSection = {
         fallbackNormalized.push(provider);
       }
     }
-    return fallbackNormalized.slice(0, 3);
+    return fallbackNormalized.slice(0, getPhoneSmsProviderCount());
   }
   function resolveNormalizedProviderOrderForRuntime(state = {}) {
     const rawOrder = Array.isArray(state?.phoneSmsProviderOrder) ? state.phoneSmsProviderOrder : [];
@@ -674,6 +698,15 @@ const rowNexSmsApiKey = { style: { display: 'none' } };
 const rowNexSmsCountry = { style: { display: 'none' } };
 const rowNexSmsCountryFallback = { style: { display: 'none' } };
 const rowNexSmsServiceCode = { style: { display: 'none' } };
+const rowMaDaoBaseUrl = { style: { display: 'none' } };
+const rowMaDaoHttpSecret = { style: { display: 'none' } };
+const rowMaDaoMode = { style: { display: 'none' } };
+const rowMaDaoRoutingPlanId = { style: { display: 'none' } };
+const rowMaDaoProviderId = { style: { display: 'none' } };
+const rowMaDaoCountry = { style: { display: 'none' } };
+const rowMaDaoAutoPickCountry = { style: { display: 'none' } };
+const rowMaDaoReusePhone = { style: { display: 'none' } };
+const rowMaDaoPriceRange = { style: { display: 'none' } };
 const rowHeroSmsRuntimePair = { style: { display: 'none' } };
 const rowHeroSmsCurrentNumber = { style: { display: 'none' } };
 const rowHeroSmsCurrentCountdown = { style: { display: 'none' } };
@@ -689,6 +722,8 @@ const rowPhoneCodePollMaxRounds = { style: { display: 'none' } };
 const rowFreePhoneReuseEnabled = createMockRow();
 const rowFreePhoneReuseAutoEnabled = createMockRow();
 const rowFreeReusablePhone = createMockRow();
+const rowPhoneSmsPreferredPriceControl = { style: { display: 'none' } };
+const rowPhoneSmsReuseControl = { style: { display: 'none' } };
 const heroSmsReuseRow = createMockRow();
 const inputHeroSmsReuseEnabled = { checked: true, disabled: false, closest: () => heroSmsReuseRow };
 const inputFreePhoneReuseEnabled = { checked: true, disabled: false };
@@ -698,10 +733,75 @@ const inputFreeReusablePhone = { disabled: false };
 const btnSaveFreeReusablePhone = { disabled: false };
 const btnClearFreeReusablePhone = { disabled: false };
 const PHONE_SMS_PROVIDER_HERO_SMS = 'hero-sms';
+const PHONE_SMS_PROVIDER_HERO = PHONE_SMS_PROVIDER_HERO_SMS;
 const PHONE_SMS_PROVIDER_FIVE_SIM = '5sim';
 const PHONE_SMS_PROVIDER_NEXSMS = 'nexsms';
+const PHONE_SMS_PROVIDER_MADAO = 'madao';
+const MADAO_MODE_ROUTING_PLAN = 'routing_plan';
+const MADAO_MODE_DIRECT = 'direct';
+const DEFAULT_MADAO_MODE = MADAO_MODE_ROUTING_PLAN;
+const PHONE_SMS_PROVIDER_UI_DESCRIPTORS = ${JSON.stringify({
+  'hero-sms': {
+    rowKeys: [
+      'rowHeroSmsCountry',
+      'rowHeroSmsCountryFallback',
+      'rowHeroSmsAcquirePriority',
+      'rowHeroSmsOperator',
+      'rowHeroSmsApiKey',
+      'rowHeroSmsMaxPrice',
+    ],
+    priceControlKeys: [
+      'rowPhoneSmsPreferredPriceControl',
+      'rowPhoneSmsReuseControl',
+    ],
+  },
+  '5sim': {
+    rowKeys: [
+      'rowFiveSimApiKey',
+      'rowFiveSimCountry',
+      'rowFiveSimCountryFallback',
+      'rowFiveSimOperator',
+      'rowFiveSimProduct',
+      'rowHeroSmsMaxPrice',
+    ],
+  },
+  nexsms: {
+    rowKeys: [
+      'rowNexSmsApiKey',
+      'rowNexSmsCountry',
+      'rowNexSmsCountryFallback',
+      'rowNexSmsServiceCode',
+    ],
+  },
+  madao: {
+    rowKeys: [
+      'rowMaDaoBaseUrl',
+      'rowMaDaoHttpSecret',
+      'rowMaDaoMode',
+    ],
+    routingRowKeys: [
+      'rowMaDaoRoutingPlanId',
+    ],
+    directRowKeys: [
+      'rowMaDaoProviderId',
+      'rowMaDaoCountry',
+      'rowMaDaoAutoPickCountry',
+      'rowMaDaoReusePhone',
+      'rowMaDaoPriceRange',
+    ],
+  },
+})};
 function getSelectedPhoneSmsProvider() { return selectPhoneSmsProvider.value; }
 function isFiveSimProviderSelected() { return getSelectedPhoneSmsProvider() === PHONE_SMS_PROVIDER_FIVE_SIM; }
+function normalizePhoneSmsProviderValue(value = '') {
+  const normalized = String(value || '').trim().toLowerCase();
+  return DEFAULT_PHONE_SMS_PROVIDER_ORDER.includes(normalized) ? normalized : PHONE_SMS_PROVIDER_HERO_SMS;
+}
+function normalizeMaDaoModeValue(value = '') { return String(value || '').trim().toLowerCase() === MADAO_MODE_DIRECT ? MADAO_MODE_DIRECT : DEFAULT_MADAO_MODE; }
+${extractFunction('getPhoneSmsProviderUiRowMap')}
+${extractFunction('getProviderUiRows')}
+${extractFunction('getAllProviderUiRows')}
+${extractFunction('updateProviderPriceControls')}
 function updateHeroSmsPlatformDisplay() {}
 function updateSignupMethodUI() {
   rowSignupMethod.style.display = inputPhoneVerificationEnabled.checked ? '' : 'none';
@@ -756,6 +856,18 @@ return {
   rowNexSmsCountry,
   rowNexSmsCountryFallback,
   rowNexSmsServiceCode,
+  rowMaDaoBaseUrl,
+  rowMaDaoHttpSecret,
+  rowMaDaoMode,
+  rowMaDaoRoutingPlanId,
+  rowMaDaoProviderId,
+  rowMaDaoCountry,
+  rowMaDaoAutoPickCountry,
+  rowMaDaoReusePhone,
+  rowMaDaoPriceRange,
+  rowPhoneSmsPreferredPriceControl,
+  rowPhoneSmsReuseControl,
+  selectMaDaoMode,
   rowHeroSmsRuntimePair,
   rowHeroSmsCurrentNumber,
   rowHeroSmsCurrentCountdown,
@@ -823,6 +935,15 @@ return {
   assert.equal(api.rowNexSmsCountry.style.display, 'none');
   assert.equal(api.rowNexSmsCountryFallback.style.display, 'none');
   assert.equal(api.rowNexSmsServiceCode.style.display, 'none');
+  assert.equal(api.rowMaDaoBaseUrl.style.display, 'none');
+  assert.equal(api.rowMaDaoHttpSecret.style.display, 'none');
+  assert.equal(api.rowMaDaoMode.style.display, 'none');
+  assert.equal(api.rowMaDaoRoutingPlanId.style.display, 'none');
+  assert.equal(api.rowMaDaoProviderId.style.display, 'none');
+  assert.equal(api.rowMaDaoCountry.style.display, 'none');
+  assert.equal(api.rowMaDaoAutoPickCountry.style.display, 'none');
+  assert.equal(api.rowMaDaoReusePhone.style.display, 'none');
+  assert.equal(api.rowMaDaoPriceRange.style.display, 'none');
 
   api.inputPhoneVerificationEnabled.checked = true;
   api.setLatestState({ signupPhoneNumber: '66959916439' });
@@ -853,6 +974,8 @@ return {
   assert.equal(api.rowHeroSmsOperator.style.display, '');
   assert.equal(api.rowHeroSmsApiKey.style.display, '');
   assert.equal(api.rowHeroSmsMaxPrice.style.display, '');
+  assert.equal(api.rowPhoneSmsPreferredPriceControl.style.display, '');
+  assert.equal(api.rowPhoneSmsReuseControl.style.display, '');
   assert.equal(api.rowFiveSimOperator.style.display, 'none');
   assert.equal(api.rowHeroSmsCurrentNumber.style.display, '');
   assert.equal(api.rowHeroSmsCurrentCountdown.style.display, '');
@@ -913,6 +1036,8 @@ return {
   assert.equal(api.rowFiveSimCountryFallback.style.display, '');
   assert.equal(api.rowFiveSimOperator.style.display, '');
   assert.equal(api.rowFiveSimProduct.style.display, '');
+  assert.equal(api.rowPhoneSmsPreferredPriceControl.style.display, 'none');
+  assert.equal(api.rowPhoneSmsReuseControl.style.display, 'none');
 
   api.setSelectedPhoneSmsProvider('nexsms');
   api.updatePhoneVerificationSettingsUI();
@@ -920,6 +1045,33 @@ return {
   assert.equal(api.rowNexSmsCountry.style.display, '');
   assert.equal(api.rowNexSmsCountryFallback.style.display, '');
   assert.equal(api.rowNexSmsServiceCode.style.display, '');
+  assert.equal(api.rowHeroSmsMaxPrice.style.display, 'none');
+  assert.equal(api.rowFiveSimOperator.style.display, 'none');
+
+  api.setSelectedPhoneSmsProvider('madao');
+  api.selectMaDaoMode.value = 'routing_plan';
+  api.updatePhoneVerificationSettingsUI();
+  assert.equal(api.rowMaDaoBaseUrl.style.display, '');
+  assert.equal(api.rowMaDaoHttpSecret.style.display, '');
+  assert.equal(api.rowMaDaoMode.style.display, '');
+  assert.equal(api.rowMaDaoRoutingPlanId.style.display, '');
+  assert.equal(api.rowMaDaoProviderId.style.display, 'none');
+  assert.equal(api.rowMaDaoCountry.style.display, 'none');
+  assert.equal(api.rowMaDaoAutoPickCountry.style.display, 'none');
+  assert.equal(api.rowMaDaoReusePhone.style.display, 'none');
+  assert.equal(api.rowMaDaoPriceRange.style.display, 'none');
+
+  api.selectMaDaoMode.value = 'direct';
+  api.updatePhoneVerificationSettingsUI();
+  assert.equal(api.rowMaDaoBaseUrl.style.display, '');
+  assert.equal(api.rowMaDaoHttpSecret.style.display, '');
+  assert.equal(api.rowMaDaoMode.style.display, '');
+  assert.equal(api.rowMaDaoRoutingPlanId.style.display, 'none');
+  assert.equal(api.rowMaDaoProviderId.style.display, '');
+  assert.equal(api.rowMaDaoCountry.style.display, '');
+  assert.equal(api.rowMaDaoAutoPickCountry.style.display, '');
+  assert.equal(api.rowMaDaoReusePhone.style.display, '');
+  assert.equal(api.rowMaDaoPriceRange.style.display, '');
 });
 
 test('collectSettingsPayload keeps local helper sync enabled while persisting sms toggle state', () => {
@@ -1005,6 +1157,16 @@ const inputFiveSimOperator = { value: 'any' };
 const inputFiveSimProduct = { value: 'openai' };
 const inputNexSmsApiKey = { value: 'nex-key' };
 const inputNexSmsServiceCode = { value: 'ot' };
+const inputMaDaoBaseUrl = { value: 'http://127.0.0.1:7822/api/acquire' };
+const inputMaDaoHttpSecret = { value: 'madao-secret' };
+const selectMaDaoMode = { value: 'direct' };
+const inputMaDaoRoutingPlanId = { value: 'plan-1' };
+const inputMaDaoProviderId = { value: 'Local Provider!!' };
+const inputMaDaoCountry = { value: 'th' };
+const inputMaDaoAutoPickCountry = { checked: false };
+const inputMaDaoReusePhone = { checked: true };
+const inputMaDaoMinPrice = { value: '0.02' };
+const inputMaDaoMaxPrice = { value: '0.2' };
 const inputHeroSmsReuseEnabled = { checked: true };
 const selectHeroSmsAcquirePriority = { value: 'price' };
 const selectHeroSmsOperator = { value: 'AIS!!' };
@@ -1052,9 +1214,15 @@ const PHONE_REPLACEMENT_LIMIT_MAX = 20;
 const DEFAULT_HERO_SMS_COUNTRY_ID = 52;
 const DEFAULT_HERO_SMS_COUNTRY_LABEL = 'Thailand';
 const PHONE_SMS_PROVIDER_HERO_SMS = 'hero-sms';
+const PHONE_SMS_PROVIDER_HERO = PHONE_SMS_PROVIDER_HERO_SMS;
 const PHONE_SMS_PROVIDER_FIVE_SIM = '5sim';
 const PHONE_SMS_PROVIDER_NEXSMS = 'nexsms';
+const PHONE_SMS_PROVIDER_MADAO = 'madao';
 const DEFAULT_PHONE_SMS_PROVIDER = PHONE_SMS_PROVIDER_HERO_SMS;
+const DEFAULT_MADAO_BASE_URL = 'http://127.0.0.1:7822';
+const MADAO_MODE_ROUTING_PLAN = 'routing_plan';
+const MADAO_MODE_DIRECT = 'direct';
+const DEFAULT_MADAO_MODE = MADAO_MODE_ROUTING_PLAN;
 const SIGNUP_METHOD_EMAIL = 'email';
 const SIGNUP_METHOD_PHONE = 'phone';
 const DEFAULT_SIGNUP_METHOD = SIGNUP_METHOD_EMAIL;
@@ -1093,6 +1261,12 @@ function normalizePlusAccountAccessStrategy(value = '') { return String(value ||
 function resolvePlusAccountAccessStrategyForTarget(value = '') { return normalizePlusAccountAccessStrategy(value); }
 ${extractFunction('normalizePhoneSmsProvider')}
 ${extractFunction('normalizePhoneSmsProviderValue')}
+${extractFunction('normalizeMaDaoBaseUrlValue')}
+${extractFunction('normalizeMaDaoModeValue')}
+${extractFunction('normalizeMaDaoIdentifierValue')}
+${extractFunction('normalizeMaDaoProviderIdValue')}
+${extractFunction('normalizeMaDaoCountry')}
+${extractFunction('normalizeMaDaoPriceValue')}
 ${extractFunction('normalizeFiveSimCountryCode')}
 ${extractFunction('normalizeFiveSimCountryOrderValue')}
 ${extractFunction('normalizeFiveSimProductValue')}
@@ -1157,6 +1331,16 @@ return { collectSettingsPayload };
   assert.equal(payload.nexSmsApiKey, 'nex-key');
   assert.deepStrictEqual(payload.nexSmsCountryOrder, [1]);
   assert.equal(payload.nexSmsServiceCode, 'ot');
+  assert.equal(payload.madaoBaseUrl, 'http://127.0.0.1:7822');
+  assert.equal(payload.madaoHttpSecret, 'madao-secret');
+  assert.equal(payload.madaoMode, 'direct');
+  assert.equal(payload.madaoRoutingPlanId, 'plan-1');
+  assert.equal(payload.madaoProviderId, 'localprovider');
+  assert.equal(payload.madaoCountry, 'TH');
+  assert.equal(payload.madaoAutoPickCountry, false);
+  assert.equal(payload.madaoReusePhone, true);
+  assert.equal(payload.madaoMinPrice, '0.02');
+  assert.equal(payload.madaoMaxPrice, '0.2');
   assert.equal(payload.phoneSmsReuseEnabled, false);
   assert.equal(payload.heroSmsReuseEnabled, false);
   assert.equal(payload.freePhoneReuseEnabled, false);
@@ -1192,8 +1376,22 @@ test('switchPhoneSmsProvider saves API keys independently when the select value 
   const api = new Function(`
 let latestState = {
   phoneSmsProvider: 'hero-sms',
+  phoneSmsProviderOrder: ['hero-sms', '5sim'],
   heroSmsApiKey: 'hero-old',
   fiveSimApiKey: 'five-old',
+  nexSmsApiKey: 'nex-old',
+  nexSmsCountryOrder: [1],
+  nexSmsServiceCode: 'ot',
+  madaoBaseUrl: 'http://127.0.0.1:7822',
+  madaoHttpSecret: 'madao-old-secret',
+  madaoMode: 'routing_plan',
+  madaoRoutingPlanId: 'plan-old',
+  madaoProviderId: 'provider-old',
+  madaoCountry: 'TH',
+  madaoAutoPickCountry: true,
+  madaoReusePhone: true,
+  madaoMinPrice: '0.01',
+  madaoMaxPrice: '0.09',
   heroSmsMinPrice: '0.04',
   heroSmsMaxPrice: '0.11',
   fiveSimMinPrice: '0.88',
@@ -1207,10 +1405,21 @@ let latestState = {
   fiveSimOperator: 'any',
 };
 const PHONE_SMS_PROVIDER_HERO_SMS = 'hero-sms';
+const PHONE_SMS_PROVIDER_HERO = PHONE_SMS_PROVIDER_HERO_SMS;
 const PHONE_SMS_PROVIDER_FIVE_SIM = '5sim';
+const PHONE_SMS_PROVIDER_NEXSMS = 'nexsms';
+const PHONE_SMS_PROVIDER_MADAO = 'madao';
+const DEFAULT_PHONE_SMS_PROVIDER = PHONE_SMS_PROVIDER_HERO_SMS;
+const DEFAULT_PHONE_SMS_PROVIDER_ORDER = ['hero-sms', '5sim', 'nexsms', 'madao'];
 const DEFAULT_FIVE_SIM_COUNTRY_ID = 'vietnam';
 const DEFAULT_FIVE_SIM_COUNTRY_LABEL = '越南 (Vietnam)';
 const DEFAULT_FIVE_SIM_OPERATOR = 'any';
+const DEFAULT_FIVE_SIM_PRODUCT = 'openai';
+const DEFAULT_NEX_SMS_SERVICE_CODE = 'ot';
+const DEFAULT_MADAO_BASE_URL = 'http://127.0.0.1:7822';
+const MADAO_MODE_ROUTING_PLAN = 'routing_plan';
+const MADAO_MODE_DIRECT = 'direct';
+const DEFAULT_MADAO_MODE = MADAO_MODE_ROUTING_PLAN;
 const DEFAULT_HERO_SMS_OPERATOR = 'any';
 const DEFAULT_HERO_SMS_COUNTRY_ID = 52;
 const DEFAULT_HERO_SMS_COUNTRY_LABEL = 'Thailand';
@@ -1218,25 +1427,64 @@ const FIVE_SIM_SUPPORTED_COUNTRY_ID_SET = new Set(['indonesia', 'thailand', 'vie
 const HERO_SMS_SUPPORTED_COUNTRY_ID_SET = new Set(['6', '52', '10']);
 const selectPhoneSmsProvider = { value: 'hero-sms', dataset: { activeProvider: 'hero-sms' } };
 const inputHeroSmsApiKey = { value: 'hero-live' };
+const inputFiveSimApiKey = { value: 'five-old' };
+const inputNexSmsApiKey = { value: 'nex-live' };
+const inputNexSmsServiceCode = { value: 'ot' };
+const inputMaDaoBaseUrl = { value: 'http://127.0.0.1:7822/api/poll' };
+const inputMaDaoHttpSecret = { value: 'madao-live-secret' };
+const selectMaDaoMode = { value: 'direct' };
+const inputMaDaoRoutingPlanId = { value: 'plan-live' };
+const inputMaDaoProviderId = { value: 'Provider Live!' };
+const inputMaDaoCountry = { value: 'local' };
+const inputMaDaoAutoPickCountry = { checked: false };
+const inputMaDaoReusePhone = { checked: false };
+const inputMaDaoMinPrice = { value: '0.02' };
+const inputMaDaoMaxPrice = { value: '0.2' };
 const inputHeroSmsMinPrice = { value: '0.03' };
 const inputHeroSmsMaxPrice = { value: '0.22' };
 const inputFiveSimOperator = { value: 'any' };
+const inputFiveSimProduct = { value: 'openai' };
 const selectHeroSmsOperator = { value: 'ais', options: [{ value: 'any' }, { value: 'ais' }] };
+const inputHeroSmsPreferredPrice = { value: '' };
 const displayHeroSmsPriceTiers = { textContent: '' };
 const displayPhoneSmsBalance = { textContent: '' };
 const rowHeroSmsPriceTiers = { style: { display: '' } };
 let heroSmsCountrySelectionOrder = [];
+let phoneSmsProviderOrderSelection = ['hero-sms', '5sim'];
+let lastPhoneSmsProviderBeforeChange = null;
 let savedPayload = null;
 
 ${extractFunction('normalizePhoneSmsProvider')}
+${extractFunction('normalizePhoneSmsProviderValue')}
+function getPhoneSmsProviderCount() { return DEFAULT_PHONE_SMS_PROVIDER_ORDER.length; }
+${extractFunction('normalizePhoneSmsProviderOrderValue')}
 ${extractFunction('setPhoneSmsProviderSelectValue')}
 ${extractFunction('getLastAppliedPhoneSmsProvider')}
 function getSelectedPhoneSmsProvider() { return normalizePhoneSmsProvider(selectPhoneSmsProvider?.value || latestState?.phoneSmsProvider); }
+function applyPhoneSmsProviderOrderSelection(order = [], options = {}) {
+  phoneSmsProviderOrderSelection = normalizePhoneSmsProviderOrderValue(order, []);
+  if (options.syncProvider && phoneSmsProviderOrderSelection.length) {
+    selectPhoneSmsProvider.value = phoneSmsProviderOrderSelection[0];
+  }
+  return [...phoneSmsProviderOrderSelection];
+}
+${extractFunction('setPhoneSmsProviderOrderPrimary')}
 ${extractFunction('normalizeFiveSimCountryId')}
 ${extractFunction('normalizeFiveSimCountryLabel')}
+${extractFunction('normalizeFiveSimCountryCode')}
 ${extractFunction('normalizeFiveSimOperator')}
+${extractFunction('normalizeFiveSimProductValue')}
 ${extractFunction('normalizeFiveSimMaxPriceValue')}
 ${extractFunction('normalizeHeroSmsMaxPriceValue')}
+${extractFunction('normalizeNexSmsCountryIdValue')}
+${extractFunction('normalizeNexSmsCountryOrderValue')}
+${extractFunction('normalizeNexSmsServiceCodeValue')}
+${extractFunction('normalizeMaDaoBaseUrlValue')}
+${extractFunction('normalizeMaDaoModeValue')}
+${extractFunction('normalizeMaDaoIdentifierValue')}
+${extractFunction('normalizeMaDaoProviderIdValue')}
+${extractFunction('normalizeMaDaoCountry')}
+${extractFunction('normalizeMaDaoPriceValue')}
 ${extractFunction('normalizePhoneSmsMinPriceValue')}
 ${extractFunction('normalizePhoneSmsMaxPriceValue')}
 ${extractFunction('normalizeHeroSmsCountryId')}
@@ -1254,11 +1502,18 @@ function syncHeroSmsFallbackSelectionOrderFromSelect() {
     ? [{ id: 'vietnam', label: '越南 (Vietnam)' }]
     : [{ id: 52, label: 'Thailand' }];
 }
+function getSelectedNexSmsCountries() { return [{ id: 1, label: 'Country #1' }]; }
 function syncLatestState(patch) { latestState = { ...latestState, ...patch }; }
 function loadHeroSmsCountries() { return Promise.resolve(); }
+function loadFiveSimCountries() { return Promise.resolve(); }
+function loadNexSmsCountries() { return Promise.resolve(); }
 function applyHeroSmsFallbackSelection() {}
+function applyFiveSimCountrySelection() {}
+function applyNexSmsCountrySelection() {}
 function setHeroSmsOperatorSelectValue(operator = latestState?.heroSmsOperator) { selectHeroSmsOperator.value = normalizeHeroSmsOperatorValue(operator); }
 function refreshHeroSmsOperatorOptions() { return Promise.resolve(); }
+${extractFunction('buildPhoneSmsProviderStatePatch')}
+${extractFunction('applyPhoneSmsProviderFieldsToInputs')}
 function updatePhoneVerificationSettingsUI() {}
 function markSettingsDirty() {}
 function saveSettings() { savedPayload = { ...latestState }; return Promise.resolve(); }
@@ -1268,6 +1523,7 @@ ${extractFunction('switchPhoneSmsProvider')}
 return {
   selectPhoneSmsProvider,
   inputHeroSmsApiKey,
+  inputFiveSimApiKey,
   inputHeroSmsMinPrice,
   get latestState() { return latestState; },
   get savedPayload() { return savedPayload; },
@@ -1284,11 +1540,12 @@ return {
   assert.equal(api.latestState.fiveSimApiKey, 'five-old');
   assert.equal(api.latestState.heroSmsMinPrice, '0.03');
   assert.equal(api.latestState.fiveSimMinPrice, '0.88');
-  assert.equal(api.inputHeroSmsApiKey.value, 'five-old');
+  assert.equal(api.inputHeroSmsApiKey.value, 'hero-live');
+  assert.equal(api.inputFiveSimApiKey.value, 'five-old');
   assert.equal(api.inputHeroSmsMinPrice.value, '0.88');
   assert.equal(api.selectPhoneSmsProvider.dataset.activeProvider, '5sim');
 
-  api.inputHeroSmsApiKey.value = 'five-live';
+  api.inputFiveSimApiKey.value = 'five-live';
   api.selectPhoneSmsProvider.value = 'hero-sms';
   await api.switchPhoneSmsProvider(api.selectPhoneSmsProvider.value);
 
@@ -1355,6 +1612,7 @@ test('previewHeroSmsPriceTiers prefers 5sim products price for buy-compatible an
 let latestState = { phoneSmsProvider: '5sim', fiveSimOperator: 'any' };
 const PHONE_SMS_PROVIDER_HERO_SMS = 'hero-sms';
 const PHONE_SMS_PROVIDER_FIVE_SIM = '5sim';
+const PHONE_SMS_PROVIDER_MADAO = 'madao';
 const DEFAULT_FIVE_SIM_COUNTRY_ID = 'vietnam';
 const DEFAULT_FIVE_SIM_COUNTRY_LABEL = '越南 (Vietnam)';
 const DEFAULT_FIVE_SIM_OPERATOR = 'any';

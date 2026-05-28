@@ -16,12 +16,8 @@
 <body>
   <header>
     <div class="header-left">
-      <button id="btn-repo-home" class="header-icon-link" type="button" aria-label="打开 GitHub 仓库" title="打开 GitHub 仓库">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-        </svg>
-      </button>
+      <button id="btn-repo-home" class="btn btn-outline btn-sm header-repo-btn" type="button"
+        aria-label="打开 GitHub 仓库" title="打开 GitHub 仓库">仓库</button>
       <div class="header-version-block">
         <div class="header-version-main">
           <button id="extension-update-status" class="header-version-title header-version-link" type="button"
@@ -36,39 +32,11 @@
         <button id="btn-contribution-mode" class="btn btn-outline btn-sm btn-contribution-mode" type="button"
           aria-pressed="false" title="进入贡献模式并打开官网页">贡献/使用教程</button>
         <input type="number" id="input-run-count" class="run-count-input" value="1" min="1" title="运行次数" />
-        <button id="btn-auto-run" class="btn btn-success" title="自动执行全部步骤">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-            <polygon points="5 3 19 12 5 21 5 3" />
-          </svg>
-          自动
-        </button>
+        <button id="btn-auto-run" class="btn btn-success" title="自动执行全部步骤">自动</button>
         <button id="btn-stop" class="btn btn-danger" title="停止当前流程" disabled>停止</button>
       </div>
-      <button id="btn-reset" class="btn btn-ghost" title="重置全部步骤">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="1 4 1 10 7 10" />
-          <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-        </svg>
-      </button>
-      <button id="btn-theme" class="theme-toggle" title="切换主题">
-        <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-        </svg>
-        <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="5" />
-          <line x1="12" y1="1" x2="12" y2="3" />
-          <line x1="12" y1="21" x2="12" y2="23" />
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-          <line x1="1" y1="12" x2="3" y2="12" />
-          <line x1="21" y1="12" x2="23" y2="12" />
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-        </svg>
-      </button>
+      <button id="btn-reset" class="btn btn-ghost btn-sm" title="重置全部步骤">重置</button>
+      <button id="btn-theme" class="btn btn-ghost btn-sm header-theme-btn" title="切换主题">主题</button>
       <div id="config-menu-shell" class="header-menu">
         <button id="btn-config-menu" class="btn btn-ghost btn-sm header-config-btn" type="button" aria-haspopup="menu"
           aria-expanded="false">配置</button>
@@ -1470,20 +1438,22 @@
                 <option value="hero-sms">HeroSMS</option>
                 <option value="5sim">5sim</option>
                 <option value="nexsms">NexSMS</option>
+                <option value="madao">MaDao</option>
               </select>
             </div>
             <div class="data-row" id="row-phone-sms-provider-order" style="display:none;">
               <span class="data-label">服务商顺序</span>
               <div class="data-inline hero-sms-country-stack">
-                <select id="select-phone-sms-provider-order" class="data-input mono" multiple size="3" style="display:none;">
+                <select id="select-phone-sms-provider-order" class="data-input mono" multiple size="4" style="display:none;">
                   <option value="hero-sms" selected>HeroSMS</option>
                   <option value="5sim" selected>5sim</option>
                   <option value="nexsms" selected>NexSMS</option>
+                  <option value="madao" selected>MaDao</option>
                 </select>
                 <div class="hero-sms-country-mainline">
                   <div id="phone-sms-provider-order-menu-shell" class="hero-sms-country-menu">
                     <button id="btn-phone-sms-provider-order-menu" class="btn btn-outline btn-sm hero-sms-country-menu-btn" type="button" aria-haspopup="listbox" aria-expanded="false">
-                      HeroSMS / 5sim / NexSMS (3/3)
+                      HeroSMS / 5sim / NexSMS / MaDao (4/4)
                     </button>
                     <div id="phone-sms-provider-order-menu" class="hero-sms-country-menu-dropdown" role="listbox" aria-multiselectable="true" hidden></div>
                   </div>
@@ -1636,6 +1606,86 @@
               <input type="text" id="input-nex-sms-service-code" class="data-input mono"
                 placeholder="ot" />
             </div>
+            <div class="data-row" id="row-madao-base-url" style="display:none;">
+              <span class="data-label">MaDao 地址</span>
+              <input type="text" id="input-madao-base-url" class="data-input mono"
+                placeholder="http://127.0.0.1:7822" />
+            </div>
+            <div class="data-row" id="row-madao-http-secret" style="display:none;">
+              <span class="data-label">MaDao 密钥</span>
+              <div class="input-with-icon">
+                <input type="password" id="input-madao-http-secret" class="data-input data-input-with-icon mono"
+                  placeholder="可空；MaDao HTTP Secret" />
+                <button id="btn-toggle-madao-http-secret" class="input-icon-btn" type="button"
+                  data-password-toggle="input-madao-http-secret" data-show-label="显示 MaDao HTTP Secret"
+                  data-hide-label="隐藏 MaDao HTTP Secret" aria-label="显示 MaDao HTTP Secret" title="显示 MaDao HTTP Secret"></button>
+              </div>
+            </div>
+            <div class="data-row" id="row-madao-mode" style="display:none;">
+              <span class="data-label">接入模式</span>
+              <select id="select-madao-mode" class="data-select mono">
+                <option value="routing_plan">路由计划</option>
+                <option value="direct">直连参数</option>
+              </select>
+            </div>
+            <div class="data-row" id="row-madao-routing-plan-id" style="display:none;">
+              <span class="data-label">路由计划</span>
+              <input type="text" id="input-madao-routing-plan-id" class="data-input mono"
+                placeholder="routing_plan_id" />
+            </div>
+            <div class="data-row" id="row-madao-provider-id" style="display:none;">
+              <span class="data-label">直连平台</span>
+              <input type="text" id="input-madao-provider-id" class="data-input mono"
+                placeholder="auto" />
+            </div>
+            <div class="data-row" id="row-madao-country" style="display:none;">
+              <span class="data-label">直连国家</span>
+              <input type="text" id="input-madao-country" class="data-input mono"
+                placeholder="local / TH / any" />
+            </div>
+            <div class="data-row" id="row-madao-auto-pick-country" style="display:none;">
+              <span class="data-label">自动选国家</span>
+              <div class="data-inline">
+                <label class="toggle-switch" for="input-madao-auto-pick-country">
+                  <input type="checkbox" id="input-madao-auto-pick-country" />
+                  <span class="toggle-switch-track" aria-hidden="true">
+                    <span class="toggle-switch-thumb"></span>
+                  </span>
+                </label>
+                <span class="data-value">让 MaDao 根据直连平台自动选择国家</span>
+              </div>
+            </div>
+            <div class="data-row" id="row-madao-reuse-phone" style="display:none;">
+              <span class="data-label">MaDao 复用</span>
+              <div class="data-inline">
+                <label class="toggle-switch" for="input-madao-reuse-phone">
+                  <input type="checkbox" id="input-madao-reuse-phone" />
+                  <span class="toggle-switch-track" aria-hidden="true">
+                    <span class="toggle-switch-thumb"></span>
+                  </span>
+                </label>
+                <span class="data-value">允许 MaDao 复用符合条件的号码</span>
+              </div>
+            </div>
+            <div class="data-row" id="row-madao-price-range" style="display:none;">
+              <span class="data-label">MaDao 价格</span>
+              <div class="data-inline hero-sms-price-preview-stack">
+                <div class="hero-sms-price-controls-grid">
+                  <div class="hero-sms-price-control">
+                    <span class="hero-sms-settings-caption">最低购买价</span>
+                    <div class="setting-controls">
+                      <input type="number" id="input-madao-min-price" class="data-input auto-delay-input mono hero-sms-max-price-input" placeholder="可空" min="0" step="0.0001" />
+                    </div>
+                  </div>
+                  <div class="hero-sms-price-control">
+                    <span class="hero-sms-settings-caption">价格上限</span>
+                    <div class="setting-controls">
+                      <input type="number" id="input-madao-max-price" class="data-input auto-delay-input mono hero-sms-max-price-input" placeholder="可空" min="0" step="0.0001" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
             <div class="data-row" id="row-hero-sms-max-price" style="display:none;">
               <span class="data-label">价格区间</span>
               <div class="data-inline hero-sms-price-preview-stack">
@@ -1660,13 +1710,13 @@
                       <input type="number" id="input-hero-sms-max-price" class="data-input auto-delay-input mono hero-sms-max-price-input" placeholder="0.12" min="0" step="0.0001" title="接码价格上限；可空（空=不设上限）" />
                     </div>
                   </div>
-                  <div class="hero-sms-price-control">
+                  <div id="row-phone-sms-preferred-price-control" class="hero-sms-price-control">
                     <span class="hero-sms-settings-caption">指定档位</span>
                     <div class="setting-controls">
                       <input type="number" id="input-hero-sms-preferred-price" class="data-input auto-delay-input mono hero-sms-max-price-input" placeholder="例如 0.0512（可空）" min="0" step="0.0001" title="优先尝试该价格档位；可空（空=按优先级策略）" />
                     </div>
                   </div>
-                  <div class="hero-sms-price-control hero-sms-price-control-reuse">
+                  <div id="row-phone-sms-reuse-control" class="hero-sms-price-control hero-sms-price-control-reuse">
                     <span class="hero-sms-settings-caption">号码复用</span>
                     <div class="setting-controls hero-sms-toggle-controls">
                       <label class="toggle-switch hero-sms-price-reuse-toggle" for="input-hero-sms-reuse-enabled" title="开启后会优先复用未超次数的可用号码">
@@ -1914,6 +1964,7 @@
   <script src="../gopay-utils.js"></script>
   <script src="../phone-sms/providers/hero-sms.js"></script>
   <script src="../phone-sms/providers/five-sim.js"></script>
+  <script src="../phone-sms/providers/madao.js"></script>
   <script src="../phone-sms/providers/registry.js"></script>
   <script src="../icloud-utils.js"></script>
   <script src="../mail-provider-utils.js"></script>

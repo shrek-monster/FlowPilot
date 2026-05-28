@@ -30,6 +30,7 @@
       DEFAULT_NEX_SMS_SERVICE_CODE = 'ot',
       DEFAULT_HERO_SMS_REUSE_ENABLED = true,
       createFiveSimProvider = null,
+      createMaDaoProvider = null,
       HERO_SMS_COUNTRY_ID = 52,
       HERO_SMS_COUNTRY_LABEL = 'Thailand',
       HERO_SMS_SERVICE_CODE = 'dr',
@@ -84,11 +85,13 @@
     const PHONE_SMS_PROVIDER_HERO_SMS = PHONE_SMS_PROVIDER_HERO;
     const PHONE_SMS_PROVIDER_FIVE_SIM = PHONE_SMS_PROVIDER_5SIM;
     const PHONE_SMS_PROVIDER_NEXSMS = 'nexsms';
+    const PHONE_SMS_PROVIDER_MADAO = 'madao';
     const DEFAULT_PHONE_SMS_PROVIDER = PHONE_SMS_PROVIDER_HERO;
     const DEFAULT_PHONE_SMS_PROVIDER_ORDER = Object.freeze([
       PHONE_SMS_PROVIDER_HERO,
       PHONE_SMS_PROVIDER_5SIM,
       PHONE_SMS_PROVIDER_NEXSMS,
+      PHONE_SMS_PROVIDER_MADAO,
     ]);
     const MAX_PHONE_REUSABLE_POOL = 12;
     const PHONE_CODE_TIMEOUT_ERROR_PREFIX = 'PHONE_CODE_TIMEOUT::';
@@ -191,6 +194,9 @@
       }
       if (normalized === PHONE_SMS_PROVIDER_NEXSMS) {
         return PHONE_SMS_PROVIDER_NEXSMS;
+      }
+      if (normalized === PHONE_SMS_PROVIDER_MADAO) {
+        return PHONE_SMS_PROVIDER_MADAO;
       }
       return PHONE_SMS_PROVIDER_HERO;
     }
@@ -489,6 +495,25 @@
       return /phone_max_usage_exceeded|phone_number_in_use|already\s+linked\s+to\s+the\s+maximum\s+number\s+of\s+accounts|phone\s+number\s+is\s+already\s+(?:in\s+use|linked|registered)|phone\s+number\s+has\s+already\s+been\s+used|already\s+associated\s+with\s+another\s+account|not\s+eligible\s+to\s+be\s+used|cannot\s+be\s+used\s+for\s+verification|号码.*(?:已|被).*(?:使用|占用|绑定|注册)|手机号.*(?:已|被).*(?:使用|占用|绑定|注册)|该手机号.*(?:已|被).*(?:使用|占用|绑定|注册)/i.test(text);
     }
 
+    function isPhoneNumberUsedFailureReason(value) {
+      const normalized = String(value || '').trim().toLowerCase();
+      if (!normalized) {
+        return false;
+      }
+      return normalized === 'phone_number_used'
+        || normalized === 'phone_number_in_use'
+        || normalized === 'phone_max_usage_exceeded'
+        || isPhoneNumberUsedError(normalized);
+    }
+
+    function getPhoneReplacementReleaseAction(reason = '') {
+      const normalized = String(reason || '').trim().toLowerCase();
+      if (normalized === 'code_rejected' || isPhoneNumberUsedFailureReason(normalized)) {
+        return 'ban';
+      }
+      return 'cancel';
+    }
+
     function isPhoneNumberInvalidError(value) {
       const text = String(value || '').trim();
       if (!text) {
@@ -680,7 +705,7 @@
       });
 
       if (normalized.length) {
-        return normalized.slice(0, 3);
+        return normalized.slice(0, DEFAULT_PHONE_SMS_PROVIDER_ORDER.length);
       }
 
       const fallback = Array.isArray(fallbackOrder) ? fallbackOrder : [];
@@ -696,7 +721,7 @@
         fallbackNormalized.push(provider);
       });
 
-      return fallbackNormalized.slice(0, 3);
+      return fallbackNormalized.slice(0, DEFAULT_PHONE_SMS_PROVIDER_ORDER.length);
     }
     function resolvePhoneProviderOrder(state = {}, preferredProvider = '') {
       const currentProvider = normalizePhoneSmsProvider(
@@ -723,7 +748,7 @@
         return fallbackOrder;
       }
       const withoutCurrent = fallbackOrder.filter((provider) => provider !== currentProvider);
-      return [currentProvider, ...withoutCurrent].slice(0, 3);
+      return [currentProvider, ...withoutCurrent].slice(0, DEFAULT_PHONE_SMS_PROVIDER_ORDER.length);
     }
 
     function reorderPriceCandidates(prices = [], acquirePriority = HERO_SMS_ACQUIRE_PRIORITY_COUNTRY, preferredPrice = null) {
@@ -961,6 +986,9 @@
       }
       if (provider === PHONE_SMS_PROVIDER_NEXSMS) {
         return 'NexSMS';
+      }
+      if (provider === PHONE_SMS_PROVIDER_MADAO) {
+        return 'MaDao';
       }
       return 'HeroSMS';
     }
@@ -1200,6 +1228,25 @@
       return createResolvedFiveSimProvider();
     }
 
+    function createResolvedMaDaoProvider() {
+      const rootScope = typeof self !== 'undefined' ? self : globalThis;
+      const factory = createMaDaoProvider || rootScope.PhoneSmsMaDaoProvider?.createProvider;
+      if (typeof factory !== 'function') {
+        return null;
+      }
+      return factory({
+        addLog,
+        fetchImpl,
+        requestTimeoutMs: DEFAULT_PHONE_REQUEST_TIMEOUT_MS,
+        sleepWithStop,
+        throwIfStopped,
+      });
+    }
+
+    function getMaDaoAdapterForState(_state = {}) {
+      return createResolvedMaDaoProvider();
+    }
+
     function normalizeFiveSimCountryId(value, fallback = 'england') {
       const normalized = String(value || '').trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '');
       return normalized || fallback;
@@ -1362,14 +1409,18 @@
       const rawProvider = String(record.provider || '').trim();
       const provider = normalizePhoneSmsProvider(rawProvider);
       const rawCountryId = record.countryId ?? record.country;
-      const fallbackCountryId = provider === PHONE_SMS_PROVIDER_FIVE_SIM ? 'england' : HERO_SMS_COUNTRY_ID;
+      const fallbackCountryId = provider === PHONE_SMS_PROVIDER_FIVE_SIM
+        ? 'england'
+        : (provider === PHONE_SMS_PROVIDER_MADAO ? '' : HERO_SMS_COUNTRY_ID);
       const expiresAt = normalizeTimestampMs(record.expiresAt);
       const serviceCode = String(
         record.serviceCode
         || (
           provider === PHONE_SMS_PROVIDER_FIVE_SIM
             ? DEFAULT_FIVE_SIM_PRODUCT
-            : (provider === PHONE_SMS_PROVIDER_NEXSMS ? DEFAULT_NEX_SMS_SERVICE_CODE : HERO_SMS_SERVICE_CODE)
+            : (provider === PHONE_SMS_PROVIDER_NEXSMS
+              ? DEFAULT_NEX_SMS_SERVICE_CODE
+              : (provider === PHONE_SMS_PROVIDER_MADAO ? 'openai' : HERO_SMS_SERVICE_CODE))
         )
       ).trim();
       const countryId = provider === PHONE_SMS_PROVIDER_FIVE_SIM
@@ -1377,7 +1428,11 @@
         : (
           provider === PHONE_SMS_PROVIDER_NEXSMS
             ? normalizeNexSmsCountryId(rawCountryId, 0)
-            : normalizeCountryId(rawCountryId, fallbackCountryId)
+            : (
+              provider === PHONE_SMS_PROVIDER_MADAO
+                ? String(rawCountryId || '').trim()
+                : normalizeCountryId(rawCountryId, fallbackCountryId)
+            )
         );
       const ignoredPhoneCodeKeys = normalizeStringList(record.ignoredPhoneCodeKeys);
       return {
@@ -1396,6 +1451,15 @@
         ...(record.phoneCodeReceived ? { phoneCodeReceived: true } : {}),
         ...(record.phoneCodeReceivedAt ? { phoneCodeReceivedAt: Math.max(0, Number(record.phoneCodeReceivedAt) || 0) } : {}),
         ...(ignoredPhoneCodeKeys.length ? { ignoredPhoneCodeKeys } : {}),
+        ...(provider === PHONE_SMS_PROVIDER_MADAO ? {
+          ...(record.madaoProviderId ? { madaoProviderId: String(record.madaoProviderId || '').trim() } : {}),
+          ...(record.madaoRoutingPlanId ? { madaoRoutingPlanId: String(record.madaoRoutingPlanId || '').trim() } : {}),
+          ...(record.madaoRoutingPlanName ? { madaoRoutingPlanName: String(record.madaoRoutingPlanName || '').trim() } : {}),
+          ...(record.madaoRoutingItemId ? { madaoRoutingItemId: String(record.madaoRoutingItemId || '').trim() } : {}),
+          ...(record.madaoAcquirePath ? { madaoAcquirePath: String(record.madaoAcquirePath || '').trim() } : {}),
+          ...(record.madaoStatus ? { madaoStatus: String(record.madaoStatus || '').trim() } : {}),
+          ...(record.madaoPrice !== undefined && record.madaoPrice !== null ? { madaoPrice: Number(record.madaoPrice) } : {}),
+        } : {}),
       };
     }
 
@@ -1570,7 +1634,7 @@
       const rawCountryId = record.countryId ?? record.country;
       const countryId = provider === PHONE_SMS_PROVIDER_FIVE_SIM
         ? normalizeFiveSimCountryId(rawCountryId, '')
-        : Math.floor(Number(rawCountryId));
+        : (provider === PHONE_SMS_PROVIDER_MADAO ? String(rawCountryId || '').trim() : Math.floor(Number(rawCountryId)));
       const countryLabel = String(record.countryLabel || '').trim();
       const statusAction = String(record.statusAction || '').trim();
 
@@ -1581,6 +1645,10 @@
         fallback.serviceCode = serviceCode;
       }
       if (provider === PHONE_SMS_PROVIDER_FIVE_SIM) {
+        if (countryId) {
+          fallback.countryId = countryId;
+        }
+      } else if (provider === PHONE_SMS_PROVIDER_MADAO) {
         if (countryId) {
           fallback.countryId = countryId;
         }
@@ -2119,6 +2187,13 @@
         };
       }
 
+      if (provider === PHONE_SMS_PROVIDER_MADAO) {
+        return {
+          provider,
+          baseUrl: normalizeUrl(state.madaoBaseUrl, 'http://127.0.0.1:7822').replace(/\/+$/, ''),
+        };
+      }
+
       const apiKey = normalizeApiKey(state.heroSmsApiKey);
       if (!apiKey) {
         throw new Error('HeroSMS API Key 缺失，请先在侧边栏保存接码 API Key。');
@@ -2150,6 +2225,16 @@
       'phoneSmsProvider',
       'phoneSmsProviderOrder',
       'phoneSmsReuseEnabled',
+      'madaoBaseUrl',
+      'madaoHttpSecret',
+      'madaoMode',
+      'madaoRoutingPlanId',
+      'madaoProviderId',
+      'madaoCountry',
+      'madaoAutoPickCountry',
+      'madaoReusePhone',
+      'madaoMinPrice',
+      'madaoMaxPrice',
       'heroSmsApiKey',
       'heroSmsBaseUrl',
       'heroSmsCountryId',
@@ -3691,6 +3776,13 @@
       state = await mergeLatestPhoneSettingsState(state, {
         preservePhoneSmsProvider: Boolean(options?.preservePhoneSmsProvider),
       });
+      if (normalizePhoneSmsProvider(state?.phoneSmsProvider) === PHONE_SMS_PROVIDER_MADAO) {
+        const provider = getMaDaoAdapterForState(state);
+        if (!provider || typeof provider.acquireActivation !== 'function') {
+          throw new Error('MaDao 接码平台模块未加载。');
+        }
+        return provider.acquireActivation(state, options);
+      }
       if (normalizePhoneSmsProvider(state?.phoneSmsProvider) === PHONE_SMS_PROVIDER_FIVE_SIM) {
         const provider = getFiveSimProviderForState(state);
         if (provider) {
@@ -4041,6 +4133,9 @@
           return provider.reuseActivation(scopeStateToActivationProvider(state, normalizedActivation), normalizedActivation);
         }
       }
+      if (getActivationProviderId(normalizedActivation, state) === PHONE_SMS_PROVIDER_MADAO) {
+        return normalizedActivation;
+      }
 
       const scopedState = scopeStateToActivationProvider(state, normalizedActivation);
       const config = resolvePhoneConfig(scopedState);
@@ -4141,6 +4236,13 @@
           return;
         }
       }
+      if (getActivationProviderId(activation, state) === PHONE_SMS_PROVIDER_MADAO) {
+        const provider = getMaDaoAdapterForState(state);
+        if (provider?.releaseActivation) {
+          await provider.releaseActivation(scopeStateToActivationProvider(state, activation), activation, 'finish');
+        }
+        return;
+      }
       await setPhoneActivationStatus(state, activation, 6, 'HeroSMS setStatus(6)');
     }
 
@@ -4161,6 +4263,13 @@
             await provider.cancelActivation(scopeStateToActivationProvider(state, activation), activation);
             return;
           }
+        }
+        if (getActivationProviderId(activation, state) === PHONE_SMS_PROVIDER_MADAO) {
+          const provider = getMaDaoAdapterForState(state);
+          if (provider?.releaseActivation) {
+            await provider.releaseActivation(scopeStateToActivationProvider(state, activation), activation, 'cancel');
+          }
+          return;
         }
         await setPhoneActivationStatus(state, activation, 8, 'HeroSMS setStatus(8)');
       } catch (_) {
@@ -4262,6 +4371,13 @@
             await provider.banActivation(scopeStateToActivationProvider(state, activation), activation);
             return;
           }
+        }
+        if (getActivationProviderId(activation, state) === PHONE_SMS_PROVIDER_MADAO) {
+          const provider = getMaDaoAdapterForState(state);
+          if (provider?.releaseActivation) {
+            await provider.releaseActivation(scopeStateToActivationProvider(state, activation), activation, 'ban');
+          }
+          return;
         }
         await setPhoneActivationStatus(state, activation, 8, 'HeroSMS setStatus(8)');
       } catch (_) {
@@ -4491,6 +4607,53 @@
           });
         }
       };
+
+      if (config.provider === PHONE_SMS_PROVIDER_MADAO) {
+        const provider = getMaDaoAdapterForState(scopedState);
+        if (!provider || typeof provider.pollActivation !== 'function') {
+          throw new Error('MaDao 接码平台模块未加载。');
+        }
+        while (Date.now() - start < timeoutMs) {
+          if (maxRounds > 0 && pollCount >= maxRounds) {
+            break;
+          }
+          throwIfStopped();
+          const payload = await provider.pollActivation(scopedState, normalizedActivation);
+          const code = typeof provider.extractCodeFromPollPayload === 'function'
+            ? provider.extractCodeFromPollPayload(payload)
+            : extractVerificationCode(payload?.code || payload?.sms_code || payload?.message || payload?.text || '');
+          const statusText = String(
+            payload?.status
+            || payload?.madaoStatus
+            || payload?.message
+            || payload?.text
+            || 'PENDING'
+          ).trim();
+          lastResponse = statusText;
+          pollCount += 1;
+
+          if (typeof options.onStatus === 'function') {
+            await options.onStatus({
+              activation: normalizedActivation,
+              elapsedMs: Date.now() - start,
+              pollCount,
+              statusText,
+              timeoutMs,
+            });
+          }
+
+          if (code) {
+            return code;
+          }
+          if (/^(cancelled|canceled|failed|expired|timeout)$/i.test(statusText)) {
+            throw new Error(`MaDao 订单在收到短信前已结束：${statusText}`);
+          }
+          await emitWaitingForCode(statusText || 'PENDING');
+          await sleepWithStop(intervalMs);
+        }
+
+        throw buildPhoneCodeTimeoutError(lastResponse);
+      }
 
       if (config.provider === PHONE_SMS_PROVIDER_5SIM) {
         while (Date.now() - start < timeoutMs) {
@@ -4733,6 +4896,9 @@
       if (normalizePhoneSmsProvider(providerId) === PHONE_SMS_PROVIDER_NEXSMS) {
         return resolveNexSmsCountryCandidates(state);
       }
+      if (normalizePhoneSmsProvider(providerId) === PHONE_SMS_PROVIDER_MADAO) {
+        return [];
+      }
       return resolveCountryCandidates(state);
     }
 
@@ -4748,6 +4914,14 @@
             return {
               id: countryId,
               label: normalizeFiveSimCountryLabel(activation.countryLabel, countryId),
+            };
+          }
+        } else if (providerId === PHONE_SMS_PROVIDER_MADAO) {
+          const countryId = String(activation.countryId || '').trim();
+          if (countryId) {
+            return {
+              id: countryId,
+              label: normalizeCountryLabel(activation.countryLabel, countryId),
             };
           }
         } else {
@@ -4775,7 +4949,9 @@
       }
       return candidates[0] || (providerId === PHONE_SMS_PROVIDER_FIVE_SIM
         ? { id: 'england', label: 'England' }
-        : resolveCountryConfig(fallbackState));
+        : (providerId === PHONE_SMS_PROVIDER_MADAO
+          ? { id: '', label: '' }
+          : resolveCountryConfig(fallbackState)));
     }
 
     async function submitPhoneNumber(tabId, phoneNumber, activation = null) {
@@ -6509,6 +6685,10 @@
           const normalizedCountryId = normalizeNexSmsCountryId(countryId, -1);
           return normalizedCountryId >= 0 ? `${normalizedProvider}:${normalizedCountryId}` : '';
         }
+        if (normalizedProvider === PHONE_SMS_PROVIDER_MADAO) {
+          const normalizedCountryId = String(countryId || '').trim();
+          return normalizedCountryId ? `${normalizedProvider}:${normalizedCountryId}` : '';
+        }
         const normalizedCountryId = normalizeCountryId(countryId, 0);
         return normalizedCountryId > 0 ? `${normalizedProvider}:${normalizedCountryId}` : '';
       };
@@ -6548,6 +6728,9 @@
           const matched = resolveNexSmsCountryCandidates(state)
             .find((entry) => normalizeNexSmsCountryId(entry.id, -1) === normalizedCountryId);
           return matched?.label || `Country #${normalizedCountryId}`;
+        }
+        if (normalizedProvider === PHONE_SMS_PROVIDER_MADAO) {
+          return normalizedCountryKey || 'MaDao';
         }
         const normalizedCountryId = normalizeCountryId(normalizedCountryKey, 0);
         const matched = resolveCountryCandidates(state)
@@ -6651,7 +6834,9 @@
       const getCountryFailureKey = (countryId, providerId = normalizePhoneSmsProvider(state?.phoneSmsProvider)) => (
         normalizePhoneSmsProvider(providerId) === PHONE_SMS_PROVIDER_FIVE_SIM
           ? normalizeFiveSimCountryId(countryId, '')
-          : String(normalizeCountryId(countryId, 0) || '')
+          : (normalizePhoneSmsProvider(providerId) === PHONE_SMS_PROVIDER_MADAO
+            ? String(countryId || '').trim()
+            : String(normalizeCountryId(countryId, 0) || ''))
       );
 
       const getCountryFailureCount = (countryId, providerId = normalizePhoneSmsProvider(state?.phoneSmsProvider)) => {
@@ -6778,6 +6963,37 @@
         );
       };
 
+      const rotateCurrentActivation = async (reason = '', releaseAction = 'cancel') => {
+        const normalizedActivation = normalizeActivation(activation);
+        if (!normalizedActivation || getActivationProviderId(normalizedActivation, state) !== PHONE_SMS_PROVIDER_MADAO) {
+          return { handled: false, nextActivation: null };
+        }
+        const provider = getMaDaoAdapterForState(state);
+        if (!provider || typeof provider.rotateActivation !== 'function') {
+          return { handled: false, nextActivation: null };
+        }
+        const rotated = await provider.rotateActivation(
+          scopeStateToActivationProvider(state, normalizedActivation),
+          normalizedActivation,
+          {
+            releaseAction,
+            reason,
+          }
+        );
+        const nextActivation = normalizeActivation(rotated?.nextActivation);
+        if (!nextActivation) {
+          return { handled: true, nextActivation: null };
+        }
+        activation = nextActivation;
+        shouldCancelActivation = true;
+        await persistCurrentActivation(nextActivation);
+        await addLog(
+          `步骤 9：MaDao 已通过路由替换切换到新号码 ${nextActivation.phoneNumber}。`,
+          'info'
+        );
+        return { handled: true, nextActivation };
+      };
+
       const rotateActivationAfterAddPhoneFailure = async (failureReason, failureCode, submitState = {}) => {
         await markPreferredActivationExhausted(failureCode || failureReason);
         usedNumberReplacementAttempts += 1;
@@ -6788,6 +7004,37 @@
           `步骤 9：添加手机号失败后正在更换号码（${formatStep9Reason(failureReason)}，${usedNumberReplacementAttempts}/${maxNumberReplacementAttempts}）。`,
           'warn'
         );
+        const rotated = shouldCancelActivation && activation
+          ? await rotateCurrentActivation(
+            failureCode || failureReason,
+            getPhoneReplacementReleaseAction(failureCode || failureReason)
+          )
+          : { handled: false, nextActivation: null };
+        if (rotated.nextActivation) {
+          preferReuseExistingActivationOnAddPhone = false;
+          addPhoneReentryWithSameActivation = 0;
+          pageState = {
+            ...pageState,
+            ...submitState,
+            addPhonePage: true,
+            phoneVerificationPage: false,
+          };
+          return;
+        }
+        if (rotated.handled) {
+          await clearCurrentActivation();
+          activation = null;
+          shouldCancelActivation = false;
+          preferReuseExistingActivationOnAddPhone = false;
+          addPhoneReentryWithSameActivation = 0;
+          pageState = {
+            ...pageState,
+            ...submitState,
+            addPhonePage: true,
+            phoneVerificationPage: false,
+          };
+          return;
+        }
         if (shouldCancelActivation && activation) {
           await cancelPhoneActivation(state, activation);
         }
@@ -6878,12 +7125,17 @@
                     `自动白嫖复用号码 ${activation.phoneNumber} 反复返回添加手机号页。`
                   );
                 }
-                if (shouldCancelActivation && activation) {
-                  await cancelPhoneActivation(state, activation);
+                const rotated = shouldCancelActivation && activation
+                  ? await rotateCurrentActivation('returned_to_add_phone_loop', 'cancel')
+                  : { handled: false, nextActivation: null };
+                if (!rotated.nextActivation) {
+                  if (!rotated.handled && shouldCancelActivation && activation) {
+                    await cancelPhoneActivation(state, activation);
+                  }
+                  await clearCurrentActivation();
+                  activation = null;
+                  shouldCancelActivation = false;
                 }
-                await clearCurrentActivation();
-                activation = null;
-                shouldCancelActivation = false;
                 preferReuseExistingActivationOnAddPhone = false;
                 addPhoneReentryWithSameActivation = 0;
                 pageState = {
@@ -6938,12 +7190,17 @@
                     `自动白嫖复用号码 ${activation.phoneNumber} 被目标站拒绝。`
                   );
                 }
-                if (shouldCancelActivation && activation) {
-                  await banPhoneActivation(state, activation);
+                const rotated = shouldCancelActivation && activation
+                  ? await rotateCurrentActivation('phone_number_used', 'ban')
+                  : { handled: false, nextActivation: null };
+                if (!rotated.nextActivation) {
+                  if (!rotated.handled && shouldCancelActivation && activation) {
+                    await banPhoneActivation(state, activation);
+                  }
+                  await clearCurrentActivation();
+                  activation = null;
+                  shouldCancelActivation = false;
                 }
-                await clearCurrentActivation();
-                activation = null;
-                shouldCancelActivation = false;
                 preferReuseExistingActivationOnAddPhone = false;
                 addPhoneReentryWithSameActivation = 0;
                 pageState = {
@@ -7079,7 +7336,11 @@
                     `自动白嫖复用号码 ${activation.phoneNumber} 被目标站拒绝。`
                   );
                 }
-                if (shouldCancelActivation && activation) {
+                if (
+                  shouldCancelActivation
+                  && activation
+                  && getActivationProviderId(activation, state) !== PHONE_SMS_PROVIDER_MADAO
+                ) {
                   await banPhoneActivation(state, activation);
                   shouldCancelActivation = false;
                 }
@@ -7093,7 +7354,11 @@
               if (attempt >= DEFAULT_PHONE_SUBMIT_ATTEMPTS) {
                 shouldReplaceNumber = true;
                 replaceReason = 'code_rejected';
-                if (shouldCancelActivation && activation) {
+                if (
+                  shouldCancelActivation
+                  && activation
+                  && getActivationProviderId(activation, state) !== PHONE_SMS_PROVIDER_MADAO
+                ) {
                   await banPhoneActivation(state, activation);
                   shouldCancelActivation = false;
                 }
@@ -7201,24 +7466,32 @@
             throw buildPhoneReplacementLimitError(maxNumberReplacementAttempts, replaceReason || 'unknown');
           }
 
-          if (shouldCancelActivation && activation) {
-            await cancelPhoneActivation(state, activation);
-          }
+          const rotated = shouldCancelActivation && activation
+            ? await rotateCurrentActivation(
+              replaceReason || 'replace_number',
+              getPhoneReplacementReleaseAction(replaceReason || 'replace_number')
+            )
+            : { handled: false, nextActivation: null };
           if (shouldRetireFreeReusableActivationOnFailure(await getState(), activation)) {
             await retireFreeReusableActivation(
               `自动白嫖复用号码 ${activation.phoneNumber} 在失败后被更换。`
             );
           }
-          if (isPhoneNumberUsedError(replaceReason)) {
+          if (isPhoneNumberUsedFailureReason(replaceReason)) {
             await discardPhoneActivationFromReuse(
               `目标站拒绝该号码（${replaceReason}）。`,
               activation,
               await getState()
             );
           }
-          await clearCurrentActivation();
-          activation = null;
-          shouldCancelActivation = false;
+          if (!rotated.nextActivation) {
+            if (!rotated.handled && shouldCancelActivation && activation) {
+              await cancelPhoneActivation(state, activation);
+            }
+            await clearCurrentActivation();
+            activation = null;
+            shouldCancelActivation = false;
+          }
           addPhoneReentryWithSameActivation = 0;
 
           let returnResult = null;
