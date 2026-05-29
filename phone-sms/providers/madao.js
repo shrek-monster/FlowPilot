@@ -42,6 +42,15 @@
     return normalizeText(value).toLowerCase().replace(/[^a-z0-9_-]+/g, '');
   }
 
+  function normalizeOperator(value = '') {
+    const rawValue = normalizeText(value);
+    const compactValue = rawValue.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (!rawValue || compactValue === 'any' || compactValue === 'anyoperator') {
+      return '';
+    }
+    return rawValue.toLowerCase().replace(/[^a-z0-9_-]+/g, '');
+  }
+
   function normalizeCountry(value = '') {
     const trimmed = normalizeText(value);
     if (!trimmed) {
@@ -255,7 +264,7 @@
       service: normalizeText(options?.service || state?.madaoServiceName, DEFAULT_SERVICE),
     };
     const country = normalizeCountry(options?.country || state?.madaoCountry);
-    const operator = normalizeProviderId(options?.operator || state?.madaoOperator);
+    const operator = normalizeOperator(options?.operator || state?.madaoOperator);
     const minPrice = normalizePrice(options?.minPrice ?? state?.madaoMinPrice);
     const maxPrice = normalizePrice(options?.maxPrice ?? state?.madaoMaxPrice);
 
@@ -708,6 +717,7 @@
     normalizeCountry,
     normalizeCountryKey,
     normalizeCountryLabel,
+    normalizeOperator,
     resolveActivationCountry,
     pollActivation,
     pollActivationCode,

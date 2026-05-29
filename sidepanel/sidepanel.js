@@ -5705,7 +5705,12 @@ function normalizeMaDaoProviderIdValue(value = '') {
 }
 
 function normalizeMaDaoOperatorValue(value = '') {
-  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '');
+  const rawValue = String(value || '').trim();
+  const compactValue = rawValue.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  if (!rawValue || compactValue === 'any' || compactValue === 'anyoperator') {
+    return '';
+  }
+  return rawValue.toLowerCase().replace(/[^a-z0-9_-]+/g, '');
 }
 
 function normalizeMaDaoCountry(value = '') {
@@ -5721,6 +5726,22 @@ function normalizeMaDaoCountry(value = '') {
     return trimmed.toUpperCase();
   }
   return lowered.replace(/[^a-z0-9_-]+/g, '');
+}
+
+function formatMaDaoCountryDisplayLabel(value = '', label = '', labelZh = '') {
+  const country = normalizeMaDaoCountry(value);
+  const sourceLabelZh = String(labelZh || '').trim();
+  const sourceLabel = String(label || '').trim();
+  if (!country) {
+    return sourceLabelZh || sourceLabel;
+  }
+  if (country === 'local') {
+    return sourceLabelZh || '本地';
+  }
+  if (country === 'any') {
+    return sourceLabelZh || '任意国家';
+  }
+  return sourceLabelZh || sourceLabel || country;
 }
 
 function normalizeMaDaoPriceValue(value = '') {
@@ -5860,6 +5881,7 @@ function normalizeMaDaoOptionListItems(items = [], selectedValue = '', normalize
     normalizedItems.push({
       value,
       label: String(item?.label || item?.name || item?.display_name || item?.displayName || value).trim() || value,
+      labelZh: String(item?.label_zh || item?.labelZh || item?.display_name_zh || item?.displayNameZh || '').trim(),
       hint: String(item?.hint || item?.description || item?.provider_value || item?.providerValue || '').trim(),
       enabled: item?.enabled !== false,
     });
@@ -5875,8 +5897,54 @@ function normalizeMaDaoOptionListItems(items = [], selectedValue = '', normalize
   return normalizedItems.filter((item) => item.enabled !== false);
 }
 
+function resolveMaDaoOptionSelectedValue(items = [], selectedValue = '', normalizeValue = normalizeMaDaoIdentifierValue) {
+  const normalizedSelected = normalizeValue(selectedValue);
+  if (!normalizedSelected) {
+    return '';
+  }
+  const sourceItems = Array.isArray(items) ? items : [];
+  for (const item of sourceItems) {
+    const value = normalizeValue(
+      item?.value
+      || item?.id
+      || item?.provider
+      || item?.provider_value
+      || item?.providerValue
+      || item?.country
+      || item?.operator
+      || ''
+    );
+    if (!value) {
+      continue;
+    }
+    const aliases = [
+      item?.value,
+      item?.id,
+      item?.provider,
+      item?.provider_value,
+      item?.providerValue,
+      item?.country,
+      item?.operator,
+      item?.label,
+      item?.label_zh,
+      item?.labelZh,
+      item?.name,
+      item?.display_name,
+      item?.displayName,
+    ];
+    if (aliases.some((alias) => normalizeValue(alias || '') === normalizedSelected)) {
+      return value;
+    }
+  }
+  return normalizedSelected;
+}
+
 function setMaDaoProviderSelectOptions(selectedValue = latestState?.madaoProviderId || '') {
-  const normalizedSelected = normalizeMaDaoProviderIdValue(selectedValue);
+  const normalizedSelected = resolveMaDaoOptionSelectedValue(
+    maDaoProviderOptions,
+    selectedValue,
+    normalizeMaDaoProviderIdValue
+  );
   const options = normalizeMaDaoOptionListItems(
     maDaoProviderOptions,
     normalizedSelected,
@@ -5890,13 +5958,20 @@ function setMaDaoProviderSelectOptions(selectedValue = latestState?.madaoProvide
 }
 
 function setMaDaoCountrySelectOptions(selectedValue = latestState?.madaoCountry || '') {
-  const normalizedSelected = normalizeMaDaoCountry(selectedValue);
+  const normalizedSelected = resolveMaDaoOptionSelectedValue(
+    maDaoCountryOptions,
+    selectedValue,
+    normalizeMaDaoCountry
+  );
   const options = normalizeMaDaoOptionListItems(
     maDaoCountryOptions,
     normalizedSelected,
     normalizeMaDaoCountry,
     '已保存的国家'
-  );
+  ).map((item) => ({
+    ...item,
+    label: formatMaDaoCountryDisplayLabel(item.value, item.label, item.labelZh),
+  }));
   setSelectOptions(selectMaDaoCountry, options, {
     placeholder: '请先选择服务商',
     value: normalizedSelected,
@@ -5904,7 +5979,11 @@ function setMaDaoCountrySelectOptions(selectedValue = latestState?.madaoCountry 
 }
 
 function setMaDaoOperatorSelectOptions(selectedValue = latestState?.madaoOperator || '') {
-  const normalizedSelected = normalizeMaDaoOperatorValue(selectedValue);
+  const normalizedSelected = resolveMaDaoOptionSelectedValue(
+    maDaoOperatorOptions,
+    selectedValue,
+    normalizeMaDaoOperatorValue
+  );
   const options = normalizeMaDaoOptionListItems(
     maDaoOperatorOptions,
     normalizedSelected,
@@ -17653,8 +17732,12 @@ function buildPhoneSmsProviderStatePatch(provider = getSelectedPhoneSmsProvider(
       madaoOperator: shouldReadMaDaoDirectControls
         ? normalizeMaDaoOperatorValue(selectMaDaoOperator?.value || '')
         : normalizeMaDaoOperatorValue(latestState?.madaoOperator || ''),
-      madaoAutoPickCountry: Boolean(inputMaDaoAutoPickCountry?.checked),
-      madaoReusePhone: Boolean(inputMaDaoReusePhone?.checked),
+      madaoAutoPickCountry: typeof inputMaDaoAutoPickCountry !== 'undefined' && inputMaDaoAutoPickCountry
+        ? Boolean(inputMaDaoAutoPickCountry.checked)
+        : (latestState?.madaoAutoPickCountry !== undefined ? Boolean(latestState.madaoAutoPickCountry) : true),
+      madaoReusePhone: typeof inputMaDaoReusePhone !== 'undefined' && inputMaDaoReusePhone
+        ? Boolean(inputMaDaoReusePhone.checked)
+        : (latestState?.madaoReusePhone !== undefined ? Boolean(latestState.madaoReusePhone) : true),
       madaoMinPrice: normalizeMaDaoPriceValue(inputMaDaoMinPrice?.value || ''),
       madaoMaxPrice: normalizeMaDaoPriceValue(inputMaDaoMaxPrice?.value || ''),
     };

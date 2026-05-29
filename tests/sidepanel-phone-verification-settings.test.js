@@ -315,8 +315,8 @@ test('MaDao direct selects load provider country and operator options from daemo
           return JSON.stringify({
             provider: 'stored-provider',
             items: [
-              { value: 'GB', label: 'United Kingdom' },
-              { value: 'TH', label: 'Thailand' },
+              { value: 'GB', label: 'United Kingdom', label_zh: '英国', provider_value: 'england' },
+              { value: 'TH', label: 'Thailand', label_zh: '泰国', provider_value: '52' },
             ],
           });
         },
@@ -331,6 +331,7 @@ test('MaDao direct selects load provider country and operator options from daemo
           return JSON.stringify({
             provider: 'stored-provider',
             items: [
+              { value: 'any', label: 'Any operator' },
               { value: 'operator-a', label: 'Operator A' },
               { value: 'operator-b', label: 'Operator B' },
             ],
@@ -347,7 +348,7 @@ let latestState = {
   madaoBaseUrl: 'http://madao.local/api/acquire',
   madaoHttpSecret: 'madao-secret',
   madaoProviderId: 'stored-provider',
-  madaoCountry: 'GB',
+  madaoCountry: 'england',
   madaoOperator: 'operator-a',
 };
 let maDaoProviderOptions = [];
@@ -358,7 +359,7 @@ let toastText = '';
 const inputMaDaoBaseUrl = { value: 'http://madao.local/api/acquire' };
 const inputMaDaoHttpSecret = { value: 'madao-secret' };
 const selectMaDaoProviderId = { value: 'stored-provider', options: [], replaceChildren(...children) { this.options = children; } };
-const selectMaDaoCountry = { value: 'GB', options: [], replaceChildren(...children) { this.options = children; } };
+const selectMaDaoCountry = { value: 'england', options: [], replaceChildren(...children) { this.options = children; } };
 const selectMaDaoOperator = { value: 'operator-a', options: [], replaceChildren(...children) { this.options = children; } };
 function updateHeroSmsPlatformDisplay() {
   displayText = [selectMaDaoProviderId.value, selectMaDaoCountry.value, selectMaDaoOperator.value].filter(Boolean).join('/');
@@ -371,9 +372,11 @@ ${extractFunction('normalizeMaDaoIdentifierValue')}
 ${extractFunction('normalizeMaDaoProviderIdValue')}
 ${extractFunction('normalizeMaDaoOperatorValue')}
 ${extractFunction('normalizeMaDaoCountry')}
+${extractFunction('formatMaDaoCountryDisplayLabel')}
 ${extractFunction('createSelectOptionElement')}
 ${extractFunction('setSelectOptions')}
 ${extractFunction('normalizeMaDaoOptionListItems')}
+${extractFunction('resolveMaDaoOptionSelectedValue')}
 ${extractFunction('setMaDaoProviderSelectOptions')}
 ${extractFunction('setMaDaoCountrySelectOptions')}
 ${extractFunction('setMaDaoOperatorSelectOptions')}
@@ -408,7 +411,9 @@ return {
   assert.equal(api.selectMaDaoOperator.value, 'operator-a');
   assert.deepStrictEqual(api.providerOptions.map((option) => option.value), ['', 'stored-provider']);
   assert.deepStrictEqual(api.countryOptions.map((option) => option.value), ['', 'GB', 'TH']);
+  assert.deepStrictEqual(api.countryOptions.map((option) => option.label), ['请先选择服务商', '英国', '泰国']);
   assert.deepStrictEqual(api.operatorOptions.map((option) => option.value), ['', 'operator-a', 'operator-b']);
+  assert.deepStrictEqual(api.operatorOptions.map((option) => option.label), ['任意线路', 'Operator A', 'Operator B']);
   assert.equal(api.displayText, 'stored-provider/GB/operator-a');
   assert.equal(api.toastText, '已刷新 MaDao 服务商。');
   assert.deepStrictEqual(requests.map((request) => request.pathname), [
@@ -1503,6 +1508,7 @@ ${extractFunction('normalizeMaDaoIdentifierValue')}
 ${extractFunction('normalizeMaDaoProviderIdValue')}
 ${extractFunction('normalizeMaDaoOperatorValue')}
 ${extractFunction('normalizeMaDaoCountry')}
+${extractFunction('formatMaDaoCountryDisplayLabel')}
 ${extractFunction('normalizeMaDaoPriceValue')}
 ${extractFunction('normalizeFiveSimCountryCode')}
 ${extractFunction('normalizeFiveSimCountryOrderValue')}
@@ -1755,9 +1761,11 @@ ${extractFunction('normalizeMaDaoProviderIdValue')}
 ${extractFunction('normalizeMaDaoOperatorValue')}
 ${extractFunction('normalizeMaDaoCountry')}
 ${extractFunction('normalizeMaDaoPriceValue')}
+${extractFunction('formatMaDaoCountryDisplayLabel')}
 ${extractFunction('createSelectOptionElement')}
 ${extractFunction('setSelectOptions')}
 ${extractFunction('normalizeMaDaoOptionListItems')}
+${extractFunction('resolveMaDaoOptionSelectedValue')}
 ${extractFunction('buildMaDaoRoutingPlanOptions')}
 ${extractFunction('setMaDaoRoutingPlanSelectOptions')}
 ${extractFunction('setMaDaoProviderSelectOptions')}
@@ -1840,6 +1848,71 @@ return {
   assert.equal(api.savedPayload.fiveSimApiKey, 'five-live');
   assert.equal(api.savedPayload.heroSmsMinPrice, '0.03');
   assert.equal(api.savedPayload.fiveSimMinPrice, '0.88');
+});
+
+test('buildPhoneSmsProviderStatePatch preserves MaDao hidden reuse defaults when controls are absent', () => {
+  const api = new Function(`
+let latestState = {
+  phoneSmsProvider: 'madao',
+  madaoBaseUrl: 'http://127.0.0.1:7822',
+  madaoHttpSecret: 'secret-old',
+  madaoMode: 'direct',
+  madaoRoutingPlanId: 'plan-old',
+  madaoProviderId: 'provider-old',
+  madaoCountry: 'TH',
+  madaoOperator: 'any',
+  madaoAutoPickCountry: true,
+  madaoReusePhone: true,
+  madaoMinPrice: '0.01',
+  madaoMaxPrice: '0.09',
+};
+const PHONE_SMS_PROVIDER_HERO_SMS = 'hero-sms';
+const PHONE_SMS_PROVIDER_HERO = PHONE_SMS_PROVIDER_HERO_SMS;
+const PHONE_SMS_PROVIDER_FIVE_SIM = '5sim';
+const PHONE_SMS_PROVIDER_NEXSMS = 'nexsms';
+const PHONE_SMS_PROVIDER_MADAO = 'madao';
+const DEFAULT_PHONE_SMS_PROVIDER = PHONE_SMS_PROVIDER_HERO_SMS;
+const DEFAULT_FIVE_SIM_COUNTRY_ID = 'vietnam';
+const DEFAULT_FIVE_SIM_COUNTRY_LABEL = '越南 (Vietnam)';
+const DEFAULT_FIVE_SIM_OPERATOR = 'any';
+const DEFAULT_FIVE_SIM_PRODUCT = 'openai';
+const DEFAULT_NEX_SMS_SERVICE_CODE = 'ot';
+const DEFAULT_MADAO_BASE_URL = 'http://127.0.0.1:7822';
+const MADAO_MODE_ROUTING_PLAN = 'routing_plan';
+const MADAO_MODE_DIRECT = 'direct';
+const DEFAULT_MADAO_MODE = MADAO_MODE_ROUTING_PLAN;
+const selectMaDaoMode = { value: 'direct' };
+const selectMaDaoRoutingPlanId = { value: 'plan-live' };
+const selectMaDaoProviderId = { value: 'provider-live' };
+const selectMaDaoCountry = { value: 'GB' };
+const selectMaDaoOperator = { value: 'Any operator' };
+const inputMaDaoBaseUrl = { value: 'http://127.0.0.1:7822/api/acquire' };
+const inputMaDaoHttpSecret = { value: 'secret-live' };
+const inputMaDaoMinPrice = { value: '0.02' };
+const inputMaDaoMaxPrice = { value: '0.20' };
+
+${extractFunction('normalizePhoneSmsProvider')}
+${extractFunction('normalizeMaDaoBaseUrlValue')}
+${extractFunction('normalizeMaDaoModeValue')}
+${extractFunction('normalizeMaDaoIdentifierValue')}
+${extractFunction('normalizeMaDaoRoutingPlanIdValue')}
+${extractFunction('normalizeMaDaoProviderIdValue')}
+${extractFunction('normalizeMaDaoOperatorValue')}
+${extractFunction('normalizeMaDaoCountry')}
+${extractFunction('normalizeMaDaoPriceValue')}
+${extractFunction('normalizePhoneSmsMinPriceValue')}
+${extractFunction('normalizePhoneSmsMaxPriceValue')}
+${extractFunction('buildPhoneSmsProviderStatePatch')}
+return { buildPhoneSmsProviderStatePatch };
+`)();
+
+  const patch = api.buildPhoneSmsProviderStatePatch('madao');
+
+  assert.equal(patch.madaoAutoPickCountry, true);
+  assert.equal(patch.madaoReusePhone, true);
+  assert.equal(patch.madaoOperator, '');
+  assert.equal(patch.madaoProviderId, 'provider-live');
+  assert.equal(patch.madaoCountry, 'GB');
 });
 
 test('HeroSMS operator helpers normalize keyed operator payloads', () => {
