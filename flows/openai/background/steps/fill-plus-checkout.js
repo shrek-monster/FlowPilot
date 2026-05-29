@@ -227,6 +227,15 @@
           const bodyText = String(document.body?.innerText || document.documentElement?.innerText || '').replace(/\r/g, '');
           const logNodes = Array.from(document.querySelectorAll('[class*="log"], [id*="log"], .design-log, .logs, pre, code'));
           const logText = logNodes.map(textOf).filter(Boolean).join('\n') || bodyText;
+          const extractLastLogLine = (rawText = '') => {
+            const lines = String(rawText || '')
+              .split(/\n+/)
+              .map((line) => line.replace(/\s+/g, ' ').trim())
+              .filter(Boolean)
+              .filter((line) => !/^(?:GPC Plus 充值|系统全自动出号|限量\d+份|自助购买卡密通道|实时进度|免费池|付费池|模式：|任务：|未开始|导出|充值模式|填写卡密|Access Token|开始 Plus 充值|停止当前任务|页面已就绪)$/i.test(line));
+            return lines[lines.length - 1] || '';
+          };
+          const lastLogLine = extractLastLogLine(logText) || extractLastLogLine(bodyText);
           const cardInputs = Array.from(document.querySelectorAll('input.card-key-seg, input[placeholder*="XXXXXXXX"], input[maxlength="8"]'))
             .filter(isVisible);
           const sessionTextarea = document.querySelector('textarea.design-session-input') || document.querySelector('textarea');
@@ -237,6 +246,7 @@
             readyState: document.readyState,
             bodyText,
             logText,
+            lastLogLine,
             hasSubscriptionDone: /订阅完成/.test(logText) || /订阅完成/.test(bodyText),
             noTrial: /该账户没有试用资格|该账号没有试用资格|没有试用资格/.test(logText) || /该账户没有试用资格|该账号没有试用资格|没有试用资格/.test(bodyText),
             startButtonText: textOf(startButton),
@@ -252,6 +262,24 @@
         },
       });
       return results?.[0]?.result || {};
+    }
+
+    function getGpcLastLogSummary(pageState = {}) {
+      const rawText = String(pageState.lastLogLine || pageState.logText || pageState.bodyText || '');
+      const lines = rawText
+        .split(/\n+/)
+        .map((line) => line.replace(/\s+/g, ' ').trim())
+        .filter(Boolean);
+      const line = lines[lines.length - 1] || '';
+      if (!line) {
+        return '';
+      }
+      return line.length > 180 ? `${line.slice(0, 180)}...` : line;
+    }
+
+    function formatGpcLastLogSuffix(pageState = {}) {
+      const summary = getGpcLastLogSummary(pageState);
+      return summary ? ` 最近日志：${summary}` : '';
     }
 
     async function ensureGpcCardMode(tabId) {
@@ -455,7 +483,7 @@
 
         if (pageState.noTrial) {
           await flushPendingStatusLog();
-          throw new Error('PLUS_CHECKOUT_NON_FREE_TRIAL::步骤 7：该账户没有试用资格，当前轮 GPC 充值失败。');
+          throw new Error(`PLUS_CHECKOUT_NON_FREE_TRIAL::步骤 7：该账户没有试用资格，当前轮 GPC 充值失败。${formatGpcLastLogSuffix(pageState)}`);
         }
 
         if (pageState.hasSubscriptionDone && /开始\s*Plus\s*充值/.test(buttonText)) {
@@ -506,16 +534,16 @@
         if (/开始\s*Plus\s*充值/.test(buttonText) && !pageState.startButtonDisabled) {
           await flushPendingStatusLog();
           if (startAttempts >= GPC_PAGE_MAX_START_ATTEMPTS) {
-            throw new Error(`GPC_PAGE_FLOW_ENDED::步骤 7：GPC 页面已尝试启动 ${startAttempts} 次仍未显示订阅完成。`);
+            throw new Error(`GPC_PAGE_FLOW_ENDED::步骤 7：GPC 页面已尝试启动 ${startAttempts} 次仍未显示订阅完成。${formatGpcLastLogSuffix(pageState)}`);
           }
           if (hasClickedStart && !pageState.hasSubscriptionDone) {
-            await addLog('步骤 7：GPC 页面回到开始状态但未显示订阅完成，准备再次启动。', 'warn');
+            await addLog(`步骤 7：GPC 页面回到开始状态但未显示订阅完成，准备再次启动。${formatGpcLastLogSuffix(pageState)}`, 'warn');
           } else {
             await addLog('步骤 7：正在点击“开始 Plus 充值”。', 'info');
           }
           const clickResult = await clickGpcStartButton(tabId);
           if (!clickResult.clicked) {
-            await addLog(`步骤 7：暂时无法点击开始按钮（${clickResult.reason || '未知原因'}），继续等待。`, 'warn');
+            await addLog(`步骤 7：暂时无法点击开始按钮（${clickResult.reason || '未知原因'}），继续等待。${formatGpcLastLogSuffix(pageState)}`, 'warn');
             await sleepWithStop(GPC_PAGE_POLL_INTERVAL_MS);
             continue;
           }
@@ -534,7 +562,8 @@
       }
 
       await flushPendingStatusLog();
-      throw new Error('GPC_PAGE_FLOW_ENDED::步骤 7：GPC 页面等待超时，未检测到订阅完成。');
+      const finalPageState = await inspectGpcPortalPage(tabId).catch(() => ({}));
+      throw new Error(`GPC_PAGE_FLOW_ENDED::步骤 7：GPC 页面等待超时，未检测到订阅完成。${formatGpcLastLogSuffix(finalPageState)}`);
     }
 
     function resolveMeiguodizhiCountryCode(value = '') {
